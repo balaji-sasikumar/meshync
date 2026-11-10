@@ -1,144 +1,147 @@
 import React, { useState } from 'react';
+import { Trash2, Search, Filter, Receipt, Users } from 'lucide-react';
 import type { Expense } from '../domain/schema.ts';
-import { EXPENSE_CATEGORIES } from '../domain/schema.ts';
-import { Trash2, Search, Filter, Calendar, Users, DollarSign } from 'lucide-react';
+import {
+  CATEGORY_INFO,
+  getAvatarColor,
+  getCurrencySymbol,
+  formatTimeAgo
+} from '../domain/ui-helpers.ts';
 
-interface Props {
+interface ExpenseListProps {
   expenses: Expense[];
   onDeleteExpense: (id: string) => void;
+  onOpenAddExpense: () => void;
+  currentUserName: string;
 }
 
-export const ExpenseList: React.FC<Props> = ({ expenses, onDeleteExpense }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+export const ExpenseList: React.FC<ExpenseListProps> = ({
+  expenses,
+  onDeleteExpense,
+  onOpenAddExpense,
+  currentUserName
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
-  const filtered = expenses
-    .filter((exp) => {
-      if (selectedCategory !== 'ALL' && exp.category !== selectedCategory) return false;
-      if (!searchTerm.trim()) return true;
-      const q = searchTerm.toLowerCase();
-      return (
-        exp.description.toLowerCase().includes(q) ||
-        exp.payer.toLowerCase().includes(q) ||
-        exp.participants.some((p) => p.toLowerCase().includes(q)) ||
-        (exp.note && exp.note.toLowerCase().includes(q))
-      );
+  const filteredExpenses = expenses
+    .filter(exp => {
+      const matchesSearch =
+        exp.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        exp.payer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        exp.participants.some(p => p.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      const matchesCategory =
+        selectedCategory === 'ALL' || exp.category === selectedCategory;
+
+      return matchesSearch && matchesCategory;
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
   return (
-    <div className="bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
-      {/* Header Controls */}
-      <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <h3 className="font-bold text-sm text-slate-100">Transaction History</h3>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
-            {filtered.length} of {expenses.length}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Search */}
-          <div className="relative flex-1 sm:w-48">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search expenses..."
-              className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          {/* Filter Category */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
-          >
-            <option value="ALL">All Categories</option>
-            {EXPENSE_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-        </div>
+    <div className="px-5 py-4">
+      {/* Section Header */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
+          Recent Bills
+        </h3>
+        <span className="text-xs font-bold text-sky-600">
+          {expenses.length} total
+        </span>
       </div>
 
-      {/* Feed */}
-      {filtered.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 text-xs">
-          {expenses.length === 0
-            ? 'No expenses logged yet. Be the first to add one!'
-            : 'No expenses match the current filter or search criteria.'}
+      {/* Search Bar */}
+      {expenses.length > 2 && (
+        <div className="relative mb-3">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search bills, payers..."
+            className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-sm"
+          />
+        </div>
+      )}
+
+      {/* Bill List */}
+      {filteredExpenses.length === 0 ? (
+        <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm text-center">
+          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-500 flex items-center justify-center mx-auto mb-3">
+            <Receipt className="w-6 h-6" />
+          </div>
+          <h4 className="text-sm font-bold text-slate-800">No bills added yet</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-[220px] mx-auto">
+            Add a bill to start splitting costs seamlessly with zero backend servers.
+          </p>
+          <button
+            onClick={onOpenAddExpense}
+            className="mt-4 px-4 py-2 bg-sky-500 text-white rounded-xl text-xs font-bold shadow-md shadow-sky-500/25 hover:bg-sky-600 transition"
+          >
+            + Add First Bill
+          </button>
         </div>
       ) : (
-        <div className="divide-y divide-slate-800/60">
-          {filtered.map((exp) => {
-            const dateStr = new Date(exp.timestamp).toLocaleDateString(undefined, {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            });
+        <div className="space-y-2.5">
+          {filteredExpenses.map(expense => {
+            const catInfo = CATEGORY_INFO[expense.category] || CATEGORY_INFO['General'];
+            const symbol = getCurrencySymbol(expense.currency);
+            const count = expense.participants.length || 1;
+            const splitPerPerson = (expense.amount / count).toFixed(2);
+            const payerColor = getAvatarColor(expense.payer);
+            const isUserPayer = expense.payer === currentUserName;
 
             return (
               <div
-                key={exp.id}
-                className="p-4 flex items-center justify-between gap-4 hover:bg-slate-800/20 transition-colors"
+                key={expense.id}
+                className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex items-center justify-between group"
               >
-                <div className="space-y-1.5 flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm text-slate-200 truncate">
-                      {exp.description}
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/50">
-                      {exp.category}
-                    </span>
+                {/* Left: Category Icon */}
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-11 h-11 rounded-2xl ${catInfo.bg} flex items-center justify-center text-xl shadow-inner shrink-0`}
+                  >
+                    {catInfo.emoji}
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
-                    <span className="flex items-center gap-1 text-slate-300">
-                      <span className="text-slate-500">Paid by</span>
-                      <strong className="text-emerald-400">{exp.payer}</strong>
-                    </span>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                      {expense.description}
+                    </h4>
 
-                    <span className="text-slate-600">•</span>
-
-                    <span className="flex items-center gap-1 text-slate-400 text-[11px]">
-                      <Users className="w-3 h-3 text-slate-500" />
-                      <span>{exp.participants.join(', ')}</span>
-                    </span>
-
-                    <span className="text-slate-600">•</span>
-
-                    <span className="text-slate-500 text-[11px]">{dateStr}</span>
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
+                      <span>{formatTimeAgo(expense.timestamp)}</span>
+                      <span>•</span>
+                      <span>{count} {count === 1 ? 'person' : 'people'}</span>
+                      <span>•</span>
+                      <span className="font-semibold text-slate-600">
+                        {isUserPayer ? 'You paid' : `${expense.payer} paid`}
+                      </span>
+                    </div>
                   </div>
-
-                  {exp.note && (
-                    <p className="text-xs text-slate-500 italic mt-0.5 truncate">{exp.note}</p>
-                  )}
                 </div>
 
-                {/* Amount & Actions */}
-                <div className="flex items-center gap-3">
+                {/* Right: Amount & Delete */}
+                <div className="flex items-center gap-2">
                   <div className="text-right">
-                    <div className="font-mono text-base font-bold text-slate-100">
-                      {exp.amount.toFixed(2)}
-                      <span className="text-xs text-emerald-400 ml-1">{exp.currency}</span>
-                    </div>
-                    <div className="text-[10px] text-slate-500">
-                      {(exp.amount / exp.participants.length).toFixed(2)}/person
-                    </div>
+                    <p className="text-sm font-black text-slate-900">
+                      {symbol}{Number(expense.amount).toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      {symbol}{splitPerPerson} / person
+                    </p>
                   </div>
 
                   <button
-                    onClick={() => onDeleteExpense(exp.id)}
-                    className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                    title="Delete expense"
+                    onClick={() => {
+                      if (confirm(`Delete "${expense.description}"?`)) {
+                        onDeleteExpense(expense.id);
+                      }
+                    }}
+                    title="Delete bill"
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition opacity-0 group-hover:opacity-100"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

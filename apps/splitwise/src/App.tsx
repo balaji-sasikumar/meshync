@@ -1,44 +1,112 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useMeshKernel, useCollection } from '@localfirst/mesh-sync';
-import type { Expense, SettlementTransaction } from './domain/schema.ts';
+import type { Expense, SettlementTransaction, GroupMeta } from './domain/schema.ts';
 import { computeAllSettlements } from './domain/debt-simplification.ts';
 import { Header } from './components/Header.tsx';
-import { PeerMeshInspector } from './components/PeerMeshInspector.tsx';
-import { ExpenseForm } from './components/ExpenseForm.tsx';
+import { HeroSummaryCard } from './components/HeroSummaryCard.tsx';
 import { ExpenseList } from './components/ExpenseList.tsx';
+import { ExpenseForm } from './components/ExpenseForm.tsx';
 import { DebtSettlementView } from './components/DebtSettlementView.tsx';
-import { StatsCard } from './components/StatsCard.tsx';
+import { BottomNav } from './components/BottomNav.tsx';
+import { MeshInspectorModal } from './components/MeshInspectorModal.tsx';
+import { OnboardingModal } from './components/OnboardingModal.tsx';
 import { SyncToast } from './components/SyncToast.tsx';
-import { Receipt, Scale, ShieldAlert, Loader2 } from 'lucide-react';
+import { ShieldAlert, Loader2 } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'expenses' | 'settlements'>('expenses');
-  const [hashKey, setHashKey] = useState(0);
+  const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false);
+  const [isMeshModalOpen, setIsMeshModalOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState<string>('');
 
-  // Initialize decoupled Headless Sync Kernel
+  // 1. Initialize decoupled Headless Sync Kernel
   const { kernel, status, isReady, error } = useMeshKernel();
 
-  // Strongly-typed reactive collection abstraction
+  // 2. Strongly-typed CRDT Collections
+  const {
+    items: groupMetaList,
+    add: setGroupMeta
+  } = useCollection<GroupMeta>(kernel, 'group_meta');
+
   const {
     items: expenses,
     add: addExpense,
     remove: removeExpense
   } = useCollection<Expense>(kernel, 'expenses');
 
-  // Compute all unique participants across expenses
+  const groupMeta: GroupMeta | null = groupMetaList[0] || null;
+
+  // 3. User Identity resolution from localStorage
+  const workspaceId = kernel?.credentials.workspaceId || 'default';
+
+  useEffect(() => {
+    if (!isReady || !workspaceId) return;
+
+    const storageKey = `peersplit_user_${workspaceId}`;
+    const savedUser = localStorage.getItem(storageKey);
+
+    if (savedUser) {
+      setCurrentUserName(savedUser);
+    } else {
+      // First time opening link: show "Who are you?" or "Create Group"
+      setIsOnboardingOpen(true);
+    }
+  }, [isReady, workspaceId]);
+
+  // If group exists but user not set, make sure modal is open
+  useEffect(() => {
+    if (isReady && !currentUserName) {
+      setIsOnboardingOpen(true);
+    }
+  }, [isReady, currentUserName]);
+
+  // 4. Compute all unique participants
   const knownParticipants = useMemo(() => {
     const set = new Set<string>();
+    if (groupMeta?.members) {
+      groupMeta.members.forEach(m => set.add(m));
+    }
     for (const exp of expenses) {
       if (exp.payer) set.add(exp.payer);
       for (const p of exp.participants) set.add(p);
     }
     return Array.from(set).sort();
-  }, [expenses]);
+  }, [groupMeta, expenses]);
 
-  // Compute pure client-side deterministic debt settlements
+  // 5. Compute pure client-side deterministic debt settlements
   const { balancesByCurrency, settlementsByCurrency } = useMemo(() => {
     return computeAllSettlements(expenses);
   }, [expenses]);
+
+  // Compute current user's net balance across the group's active currency
+  const userNetBalance = useMemo(() => {
+    if (!currentUserName) return 0;
+    const groupCurrency = groupMeta?.currency || (expenses[0]?.currency) || 'USD';
+    const balances = balancesByCurrency.get(groupCurrency) || [];
+    const userBalanceObj = balances.find(b => b.person.toLowerCase() === currentUserName.toLowerCase());
+    return userBalanceObj ? userBalanceObj.balance : 0;
+  }, [balancesByCurrency, groupMeta, expenses, currentUserName]);
+
+  // 6. Action Handlers
+  const handleSaveGroup = (newGroup: GroupMeta) => {
+    setGroupMeta({
+      ...newGroup,
+      id: 'current_group'
+    });
+    // If user has not chosen name yet, keep onboarding open for "Who are you?" step
+    if (!currentUserName && newGroup.members.length > 0) {
+      // Stay open in who_are_you mode
+    } else {
+      setIsOnboardingOpen(false);
+    }
+  };
+
+  const handleSelectUser = (userName: string) => {
+    setCurrentUserName(userName);
+    localStorage.setItem(`peersplit_user_${workspaceId}`, userName);
+    setIsOnboardingOpen(false);
+  };
 
   const handleAddExpense = (newExpense: Omit<Expense, 'id'>) => {
     addExpense({
@@ -48,7 +116,6 @@ export const App: React.FC = () => {
   };
 
   const handleSettleUp = (settlement: SettlementTransaction) => {
-    // Record an offsetting settlement expense that pays from debtor to creditor
     addExpense({
       id: `settle_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       description: `Settlement: ${settlement.from} → ${settlement.to}`,
@@ -62,17 +129,11 @@ export const App: React.FC = () => {
     });
   };
 
-  const handleSwitchWorkspace = (newHash: string) => {
-    if (typeof window !== 'undefined') {
-      window.location.hash = newHash;
-    }
-  };
-
   const handleExportJson = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(expenses, null, 2));
     const a = document.createElement('a');
     a.href = dataStr;
-    a.download = `peersplit-${kernel?.credentials.workspaceId || 'backup'}-${Date.now()}.json`;
+    a.download = `peersplit-${workspaceId}-${Date.now()}.json`;
     a.click();
   };
 
@@ -104,10 +165,17 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleOpenNewGroup = () => {
+    if (confirm('Create a brand new P2P expense group with a new encrypted link?')) {
+      window.location.hash = '';
+      window.location.reload();
+    }
+  };
+
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <div className="bg-rose-950/40 border border-rose-800 rounded-xl p-6 max-w-md text-center">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-rose-950/60 border border-rose-800 rounded-3xl p-6 max-w-sm text-center text-white">
           <ShieldAlert className="w-12 h-12 text-rose-400 mx-auto mb-3" />
           <h2 className="text-base font-bold text-rose-200">Mesh Sync Initialization Error</h2>
           <p className="text-xs text-rose-300/80 mt-1 font-mono">{error.message}</p>
@@ -116,86 +184,104 @@ export const App: React.FC = () => {
     );
   }
 
-  if (!isReady) {
+  if (!isReady || !status) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
-        <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mb-3" />
-        <h2 className="text-sm font-semibold text-slate-300">Deriving Keys & Loading Mesh Kernel...</h2>
-        <p className="text-xs text-slate-500 mt-1 font-mono">End-to-End Encrypted Offline Store</p>
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
+        <Loader2 className="w-10 h-10 text-sky-400 animate-spin mb-3" />
+        <h2 className="text-sm font-semibold text-slate-200">Connecting to P2P Mesh...</h2>
+        <p className="text-xs text-slate-400 mt-1">Zero-Server Local-First Engine</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <Header
-        kernel={kernel}
-        status={status}
-        onSwitchWorkspace={handleSwitchWorkspace}
-        onExportJson={handleExportJson}
-        onExportSnapshot={handleExportSnapshot}
-        onImportJson={handleImportJson}
-      />
+    <div className="min-h-screen bg-slate-100 flex justify-center selection:bg-sky-500 selection:text-white">
+      {/* Mobile-Friendly Native Container (max-w-md on desktop, 100% on mobile) */}
+      <div className="w-full max-w-md bg-slate-50 min-h-screen flex flex-col relative shadow-2xl pb-20">
+        {/* Floating Minimal Sync Toast */}
+        <SyncToast status={status} />
 
-      <main className="max-w-6xl mx-auto px-4 pb-16 flex-1 w-full">
-        {/* Peer Mesh & Decentralized Fallback Inspector */}
-        <PeerMeshInspector kernel={kernel} status={status} />
-
-        {/* Global Stats */}
-        <StatsCard
-          expenses={expenses}
-          settlementsByCurrency={settlementsByCurrency}
-          knownParticipants={knownParticipants}
+        {/* Clean Mobile App Header */}
+        <Header
+          kernel={kernel}
+          status={status}
+          groupMeta={groupMeta}
+          currentUserName={currentUserName}
+          onOpenMeshModal={() => setIsMeshModalOpen(true)}
+          onOpenSwitchUser={() => setIsOnboardingOpen(true)}
+          onOpenNewGroup={handleOpenNewGroup}
         />
 
-        {/* View Toggle Tabs */}
-        <div className="flex items-center gap-2 mb-6 border-b border-slate-800">
-          <button
-            onClick={() => setActiveTab('expenses')}
-            className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-xs border-b-2 transition-all ${
-              activeTab === 'expenses'
-                ? 'border-emerald-400 text-emerald-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Receipt className="w-4 h-4" />
-            <span>Group Expenses ({expenses.length})</span>
-          </button>
+        {/* Hero Summary Card */}
+        <HeroSummaryCard
+          expenses={expenses}
+          groupMeta={groupMeta}
+          currentUserName={currentUserName}
+          userNetBalance={userNetBalance}
+          onOpenAddExpense={() => setIsExpenseFormOpen(true)}
+          onViewPayoffs={() => setActiveTab('settlements')}
+        />
 
-          <button
-            onClick={() => setActiveTab('settlements')}
-            className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-xs border-b-2 transition-all ${
-              activeTab === 'settlements'
-                ? 'border-emerald-400 text-emerald-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Scale className="w-4 h-4" />
-            <span>Optimal Payoff Graph</span>
-          </button>
-        </div>
+        {/* Tab Content */}
+        <main className="flex-1">
+          {activeTab === 'expenses' ? (
+            <ExpenseList
+              expenses={expenses}
+              onDeleteExpense={removeExpense}
+              onOpenAddExpense={() => setIsExpenseFormOpen(true)}
+              currentUserName={currentUserName}
+            />
+          ) : (
+            <DebtSettlementView
+              balancesByCurrency={balancesByCurrency}
+              settlementsByCurrency={settlementsByCurrency}
+              onSettleUp={handleSettleUp}
+              groupMeta={groupMeta}
+              currentUserName={currentUserName}
+            />
+          )}
+        </main>
 
-        {activeTab === 'expenses' ? (
-          <div>
-            <ExpenseForm onAddExpense={handleAddExpense} knownParticipants={knownParticipants} />
-            <ExpenseList expenses={expenses} onDeleteExpense={removeExpense} />
-          </div>
-        ) : (
-          <DebtSettlementView
-            balancesByCurrency={balancesByCurrency}
-            settlementsByCurrency={settlementsByCurrency}
-            onSettleUp={handleSettleUp}
-            rawExpenseCount={expenses.length}
-          />
-        )}
-      </main>
+        {/* Mobile Bottom Navigation */}
+        <BottomNav
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
+          onOpenAddExpense={() => setIsExpenseFormOpen(true)}
+          expenseCount={expenses.length}
+        />
 
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 font-mono">
-        PeerSplit • Zero-Server Local-First Mesh Architecture • Web Crypto + CRDT + WebRTC + IPFS
-      </footer>
+        {/* Onboarding & "Who Are You?" Modal */}
+        <OnboardingModal
+          isOpen={isOnboardingOpen}
+          groupMeta={groupMeta}
+          currentUserName={currentUserName}
+          onSaveGroup={handleSaveGroup}
+          onSelectUser={handleSelectUser}
+          onClose={currentUserName ? () => setIsOnboardingOpen(false) : undefined}
+        />
 
-      {/* Reactive Mesh & Sync Notification Toast */}
-      <SyncToast kernel={kernel} status={status} />
+        {/* Add Expense Form Modal (With Checkboxes as requested) */}
+        <ExpenseForm
+          isOpen={isExpenseFormOpen}
+          onClose={() => setIsExpenseFormOpen(false)}
+          onSubmit={handleAddExpense}
+          groupMeta={groupMeta}
+          currentUserName={currentUserName}
+        />
+
+        {/* P2P Mesh Details Modal (Hidden behind header icon as requested) */}
+        <MeshInspectorModal
+          isOpen={isMeshModalOpen}
+          onClose={() => setIsMeshModalOpen(false)}
+          kernel={kernel}
+          status={status}
+          groupMeta={groupMeta}
+          onUpdateGroupMeta={setGroupMeta}
+          onExportJson={handleExportJson}
+          onExportSnapshot={handleExportSnapshot}
+          onImportJson={handleImportJson}
+        />
+      </div>
     </div>
   );
 };

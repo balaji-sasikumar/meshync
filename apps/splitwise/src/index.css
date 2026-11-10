@@ -6,7 +6,8 @@
 
 :root {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
+  -webkit-tap-highlight-color: transparent;
 }
 
 code, pre, .font-mono {
@@ -16,23 +17,23 @@ code, pre, .font-mono {
 body {
   margin: 0;
   padding: 0;
-  background-color: #090d16;
-  color: #f1f5f9;
+  background-color: #f1f5f9;
+  color: #0f172a;
   min-height: 100vh;
 }
 
-/* Custom modern scrollbar */
+/* Custom smooth scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+  background: #cbd5e1;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #94a3b8;
 }

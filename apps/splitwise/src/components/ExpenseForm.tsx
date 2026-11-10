@@ -1,279 +1,336 @@
-import React, { useState } from 'react';
-import type { Expense, SupportedCurrency } from '../domain/schema.ts';
-import { SUPPORTED_CURRENCIES, EXPENSE_CATEGORIES } from '../domain/schema.ts';
-import { Plus, Users, DollarSign, Tag, FileText, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  Check,
+  DollarSign,
+  Calendar,
+  Users,
+  CheckSquare,
+  Square
+} from 'lucide-react';
+import {
+  EXPENSE_CATEGORIES,
+  SUPPORTED_CURRENCIES,
+  SupportedCurrency,
+  Expense,
+  GroupMeta
+} from '../domain/schema.ts';
+import {
+  CATEGORY_INFO,
+  getAvatarColor,
+  getCurrencySymbol
+} from '../domain/ui-helpers.ts';
 
-interface Props {
-  onAddExpense: (expense: Omit<Expense, 'id'>) => void;
-  knownParticipants: string[];
+interface ExpenseFormProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (expense: Omit<Expense, 'id'>) => void;
+  groupMeta: GroupMeta | null;
+  currentUserName: string;
 }
 
-export const ExpenseForm: React.FC<Props> = ({ onAddExpense, knownParticipants }) => {
+export const ExpenseForm: React.FC<ExpenseFormProps> = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  groupMeta,
+  currentUserName
+}) => {
+  const members = groupMeta?.members && groupMeta.members.length > 0
+    ? groupMeta.members
+    : [currentUserName || 'You'];
+
+  const defaultCurrency = (groupMeta?.currency as SupportedCurrency) || 'USD';
+
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<SupportedCurrency>('USD');
-  const [payer, setPayer] = useState('');
-  const [participantInput, setParticipantInput] = useState('');
-  const [participants, setParticipants] = useState<string[]>([]);
-  const [category, setCategory] = useState<string>(EXPENSE_CATEGORIES[0]);
+  const [currency, setCurrency] = useState<SupportedCurrency>(defaultCurrency);
+  const [payer, setPayer] = useState(currentUserName || members[0] || 'You');
+  const [participants, setParticipants] = useState<string[]>(members);
+  const [category, setCategory] = useState<string>('Food & Dining');
   const [note, setNote] = useState('');
-  const [isOpen, setIsOpen] = useState(false);
 
-  // Toggle participant in active list
-  const toggleParticipant = (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (participants.includes(trimmed)) {
-      setParticipants(participants.filter((p) => p !== trimmed));
+  // Keep members in sync if group changes
+  useEffect(() => {
+    if (members.length > 0) {
+      setParticipants(members);
+      if (!payer || !members.includes(payer)) {
+        setPayer(currentUserName || members[0]);
+      }
+    }
+  }, [groupMeta?.members, currentUserName]);
+
+  if (!isOpen) return null;
+
+  const handleToggleParticipant = (person: string) => {
+    if (participants.includes(person)) {
+      if (participants.length > 1) {
+        setParticipants(participants.filter(p => p !== person));
+      }
     } else {
-      setParticipants([...participants, trimmed]);
+      setParticipants([...participants, person]);
     }
   };
 
-  const handleAddCustomParticipant = (e: React.KeyboardEvent | React.MouseEvent) => {
-    if ('key' in e && e.key !== 'Enter') return;
-    e.preventDefault();
-    const trimmed = participantInput.trim();
-    if (trimmed && !participants.includes(trimmed)) {
-      setParticipants([...participants, trimmed]);
-      setParticipantInput('');
-      if (!payer) setPayer(trimmed);
-    }
+  const handleSelectAll = () => {
+    setParticipants(members);
+  };
+
+  const handleDeselectAll = () => {
+    // Keep at least payer or current user
+    setParticipants([payer]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsedAmount = parseFloat(amount);
-    if (!description.trim() || isNaN(parsedAmount) || parsedAmount <= 0) return;
-    if (!payer.trim()) return;
+    if (isNaN(parsedAmount) || parsedAmount <= 0) return;
+    if (!description.trim() || participants.length === 0) return;
 
-    // Ensure payer is at least in participants if none specified
-    const activeParticipants = participants.length > 0 ? participants : [payer.trim()];
-
-    onAddExpense({
+    onSubmit({
       description: description.trim(),
       amount: parsedAmount,
       currency,
-      payer: payer.trim(),
-      participants: activeParticipants,
+      payer,
+      participants,
       category,
       note: note.trim() || undefined,
       timestamp: Date.now()
     });
 
-    // Reset fields
+    // Reset and close
     setDescription('');
     setAmount('');
     setNote('');
-    setIsOpen(false);
+    onClose();
   };
 
-  // Union of known members + any newly typed
-  const allSuggested = Array.from(new Set([...knownParticipants, ...participants]));
+  const splitAmount = parseFloat(amount) > 0 && participants.length > 0
+    ? (parseFloat(amount) / participants.length).toFixed(2)
+    : '0.00';
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-lg mb-6">
-      {!isOpen ? (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="w-full px-5 py-3.5 flex items-center justify-between text-slate-300 hover:text-emerald-400 hover:bg-slate-800/40 transition-all font-semibold text-sm"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-              <Plus className="w-4 h-4" />
-            </div>
-            <span>Add New Expense</span>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white text-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 relative border border-slate-100 max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-lg font-extrabold text-slate-900">Add New Bill</h2>
+            <p className="text-[11px] text-slate-500">Split costs evenly with your group</p>
           </div>
-          <span className="text-xs text-slate-500 font-normal">Splits automatically across group</span>
-        </button>
-      ) : (
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-emerald-400" />
-              New Group Expense
-            </h3>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="text-xs text-slate-400 hover:text-slate-200"
-            >
-              Cancel
-            </button>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Category Chips */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+              Category
+            </label>
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              {EXPENSE_CATEGORIES.map(cat => {
+                const info = CATEGORY_INFO[cat];
+                const isSelected = category === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategory(cat)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+                      isSelected
+                        ? 'bg-sky-500 border-sky-500 text-white shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>{info.emoji}</span>
+                    <span>{cat}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {/* Description */}
-            <div className="md:col-span-2 space-y-1">
-              <label className="text-xs font-semibold text-slate-400">Description</label>
-              <input
-                type="text"
-                required
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g. Dinner at Shinjuku, Train tickets"
-                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
-              />
-            </div>
+          {/* Title / Description */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Bill Title
+            </label>
+            <input
+              type="text"
+              required
+              autoFocus
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="e.g. Cheese Burger, Taxi, Groceries..."
+              className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
+            />
+          </div>
 
-            {/* Amount & Currency */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-400">Amount & Currency</label>
-              <div className="flex gap-2">
+          {/* Amount & Currency */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                Total Amount
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+                  {getCurrencySymbol(currency)}
+                </span>
                 <input
                   type="number"
                   step="0.01"
+                  min="0.01"
                   required
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={e => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                  className="w-full pl-8 pr-4 py-2.5 text-base font-extrabold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
                 />
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value as SupportedCurrency)}
-                  className="px-2 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm font-semibold text-emerald-400 focus:outline-none focus:border-emerald-500"
-                >
-                  {SUPPORTED_CURRENCIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Paid By */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-400">Who Paid?</label>
-              <input
-                type="text"
-                required
-                value={payer}
-                onChange={(e) => setPayer(e.target.value)}
-                placeholder="e.g. Alice"
-                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
-              />
-              {allSuggested.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <span className="text-[10px] text-slate-500 self-center">Quick pick:</span>
-                  {allSuggested.map((name) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => setPayer(name)}
-                      className={`text-[11px] px-2 py-0.5 rounded-md font-medium transition-colors ${
-                        payer === name
-                          ? 'bg-emerald-500 text-slate-950 font-bold'
-                          : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Category */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-400">Category</label>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                Currency
+              </label>
               <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                value={currency}
+                onChange={e => setCurrency(e.target.value as SupportedCurrency)}
+                className="w-full px-3 py-2.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all h-[42px]"
               >
-                {EXPENSE_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
+                {SUPPORTED_CURRENCIES.map(curr => (
+                  <option key={curr} value={curr}>
+                    {curr} ({getCurrencySymbol(curr)})
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Participants Split */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-emerald-400" />
-                Split With Whom? ({participants.length} selected)
+          {/* Paid By */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Paid By
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {members.map(member => {
+                const isSelected = payer === member;
+                const color = getAvatarColor(member);
+                return (
+                  <button
+                    key={member}
+                    type="button"
+                    onClick={() => setPayer(member)}
+                    className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all ${
+                      isSelected
+                        ? 'bg-sky-50 border-sky-500 ring-1 ring-sky-500 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${color.bg} ${color.text}`}
+                    >
+                      {member.substring(0, 2).toUpperCase()}
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 truncate">
+                      {member}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Split Between with Checkboxes (Requested by User) */}
+          <div className="pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Split Between ({participants.length} selected)
               </label>
-              {allSuggested.length > 0 && (
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setParticipants([...allSuggested])}
-                  className="text-[11px] text-emerald-400 hover:underline"
+                  onClick={handleSelectAll}
+                  className="text-[11px] font-bold text-sky-600 hover:text-sky-700"
                 >
                   Select All
                 </button>
-              )}
+                <span className="text-slate-300">•</span>
+                <button
+                  type="button"
+                  onClick={handleDeselectAll}
+                  className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
 
-            {/* Existing Participants Chips */}
-            {allSuggested.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pb-1">
-                {allSuggested.map((name) => {
-                  const isSelected = participants.includes(name);
-                  return (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => toggleParticipant(name)}
-                      className={`text-xs px-2.5 py-1 rounded-lg border font-medium flex items-center gap-1.5 transition-all ${
-                        isSelected
-                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                          : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                      }`}
-                    >
-                      {isSelected && <Check className="w-3 h-3 text-emerald-400" />}
-                      <span>{name}</span>
-                    </button>
-                  );
-                })}
+            {/* Checkbox List of Members */}
+            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              {members.map(person => {
+                const isChecked = participants.includes(person);
+                const color = getAvatarColor(person);
+                return (
+                  <label
+                    key={person}
+                    className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer select-none transition-all ${
+                      isChecked
+                        ? 'bg-sky-50/70 border-sky-300'
+                        : 'bg-slate-50 border-slate-200 opacity-60 hover:opacity-90'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleParticipant(person)}
+                          className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer"
+                        />
+                      </div>
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${color.bg} ${color.text}`}
+                      >
+                        {person.substring(0, 2).toUpperCase()}
+                      </div>
+                      <span className="text-xs font-bold text-slate-800">
+                        {person} {person === currentUserName && '(You)'}
+                      </span>
+                    </div>
+
+                    {isChecked && parseFloat(amount) > 0 && (
+                      <span className="text-xs font-bold text-sky-600">
+                        {getCurrencySymbol(currency)}{splitAmount}
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+
+            {/* Split Summary Footer */}
+            {parseFloat(amount) > 0 && participants.length > 0 && (
+              <div className="mt-2.5 p-2 bg-slate-100 rounded-xl text-center text-xs font-semibold text-slate-600">
+                Split equally: <span className="font-extrabold text-slate-900">{getCurrencySymbol(currency)}{splitAmount}</span> / person ({participants.length} people)
               </div>
             )}
-
-            {/* Add New Participant Input */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={participantInput}
-                onChange={(e) => setParticipantInput(e.target.value)}
-                onKeyDown={handleAddCustomParticipant}
-                placeholder="Type member name & press Enter (e.g. Charlie)"
-                className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
-              />
-              <button
-                type="button"
-                onClick={handleAddCustomParticipant}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
-              >
-                Add
-              </button>
-            </div>
           </div>
 
-          {/* Submit */}
-          <div className="pt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all"
-            >
-              Record Expense
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={!description.trim() || !amount || participants.length === 0}
+            className="w-full py-3 bg-sky-500 hover:bg-sky-600 active:scale-[0.98] text-white font-extrabold rounded-2xl shadow-lg shadow-sky-500/25 transition flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+          >
+            <Check className="w-4 h-4" />
+            <span>Add Bill</span>
+          </button>
         </form>
-      )}
+      </div>
     </div>
   );
 };

@@ -1,115 +1,38 @@
 import React, { useEffect, useState } from 'react';
-import type { MeshKernel, MeshKernelStatus } from '@localfirst/mesh-sync';
-import { Wifi, Radio, HardDrive, CheckCircle2, X } from 'lucide-react';
+import type { MeshKernelStatus } from '@localfirst/mesh-sync';
 
-interface ToastMessage {
-  id: string;
-  title: string;
-  detail?: string;
-  type: 'peer' | 'sync' | 'storage' | 'ipfs';
-  timestamp: number;
+interface SyncToastProps {
+  status: MeshKernelStatus;
 }
 
-interface Props {
-  kernel: MeshKernel | null;
-  status: MeshKernelStatus | null;
-}
-
-export const SyncToast: React.FC<Props> = ({ kernel, status }) => {
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [prevPeerCount, setPrevPeerCount] = useState<number>(0);
-  const [prevCid, setPrevCid] = useState<string | null>(null);
+export const SyncToast: React.FC<SyncToastProps> = ({ status }) => {
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [prevPeerCount, setPrevPeerCount] = useState(status.peersCount);
 
   useEffect(() => {
-    if (!status) return;
-
-    // Detect new peer connection
-    if (status.peersCount > prevPeerCount && prevPeerCount > 0) {
-      addToast({
-        id: `peer_${Date.now()}`,
-        title: 'New WebRTC Peer Connected',
-        detail: `${status.peersCount} peer(s) in active mesh`,
-        type: 'peer',
-        timestamp: Date.now()
-      });
+    if (status.peersCount > prevPeerCount) {
+      setToastMessage(`Peer joined mesh (${status.peersCount} active)`);
+    } else if (status.peersCount < prevPeerCount && prevPeerCount > 0) {
+      setToastMessage(`Peer left (${status.peersCount} active)`);
     }
     setPrevPeerCount(status.peersCount);
-
-    // Detect new IPFS Snapshot
-    if (status.latestIpfsCid && status.latestIpfsCid !== prevCid && prevCid !== null) {
-      addToast({
-        id: `cid_${Date.now()}`,
-        title: 'Encrypted IPFS Snapshot Published',
-        detail: `CID: ${status.latestIpfsCid.slice(0, 16)}...`,
-        type: 'ipfs',
-        timestamp: Date.now()
-      });
-    }
-    setPrevCid(status.latestIpfsCid);
-  }, [status]);
+  }, [status.peersCount]);
 
   useEffect(() => {
-    if (!kernel) return;
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 2400);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
-    // Listen to CRDT updates from remote mesh
-    const unsubscribe = kernel.docManager.subscribeToUpdates((event) => {
-      if (event.origin === 'remote-mesh') {
-        addToast({
-          id: `update_${Date.now()}`,
-          title: 'Remote CRDT Delta Reconciled',
-          detail: 'Symmetric vector-clock state merged without conflicts',
-          type: 'sync',
-          timestamp: Date.now()
-        });
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [kernel]);
-
-  const addToast = (toast: ToastMessage) => {
-    setToasts((prev) => [toast, ...prev.slice(0, 2)]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== toast.id));
-    }, 4000);
-  };
-
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  if (toasts.length === 0) return null;
+  if (!toastMessage) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
-      {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className="pointer-events-auto bg-slate-900/95 border border-slate-700/80 shadow-2xl rounded-xl p-3 flex items-start justify-between gap-3 text-xs animate-in slide-in-from-bottom-2 fade-in"
-        >
-          <div className="flex items-start gap-2.5">
-            <div className="mt-0.5">
-              {toast.type === 'peer' && <Radio className="w-4 h-4 text-emerald-400" />}
-              {toast.type === 'sync' && <CheckCircle2 className="w-4 h-4 text-cyan-400" />}
-              {toast.type === 'ipfs' && <HardDrive className="w-4 h-4 text-amber-400" />}
-              {toast.type === 'storage' && <Wifi className="w-4 h-4 text-indigo-400" />}
-            </div>
-            <div>
-              <span className="font-semibold text-slate-100 block">{toast.title}</span>
-              {toast.detail && <span className="text-slate-400 text-[11px] font-mono">{toast.detail}</span>}
-            </div>
-          </div>
-
-          <button
-            onClick={() => removeToast(toast.id)}
-            className="text-slate-500 hover:text-slate-300 p-0.5 rounded"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ))}
+    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-in fade-in slide-in-from-top-2 duration-200">
+      <div className="px-3.5 py-1.5 rounded-full bg-slate-900/90 text-white backdrop-blur-md shadow-lg border border-white/15 text-xs font-medium flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <span>{toastMessage}</span>
+      </div>
     </div>
   );
 };

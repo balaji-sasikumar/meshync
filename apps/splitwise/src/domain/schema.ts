@@ -1,3 +1,11 @@
+export interface GroupMeta {
+  id: string; // 'current_group'
+  name: string;
+  currency: string;
+  members: string[];
+  createdAt: number;
+}
+
 export interface Expense {
   id: string;
   description: string;
