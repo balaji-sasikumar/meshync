@@ -1,0 +1,19 @@
+{
+  "name": "ipfs-splitwise-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "dev:splitwise": "npm run dev --workspace=p2p-splitwise",
+    "dev:bookmarks": "npm run dev --workspace=p2p-bookmarks"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
+
