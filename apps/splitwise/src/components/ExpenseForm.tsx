@@ -105,22 +105,9 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
   const handleSwitchSplitType = (newType: SplitType) => {
     setSplitType(newType);
-    if (newType === 'EXACT') {
-      const updated: Record<string, string> = {};
-      const count = participants.length || 1;
-      const base = totalAmount > 0 ? (totalAmount / count).toFixed(2) : '';
-      for (const p of participants) {
-        updated[p] = customSplits[p] || base;
-      }
-      setCustomSplits(updated);
-    } else if (newType === 'PERCENTAGE') {
-      const updated: Record<string, string> = {};
-      const count = participants.length || 1;
-      const base = (100 / count).toFixed(1);
-      for (const p of participants) {
-        updated[p] = customSplits[p] || base;
-      }
-      setCustomSplits(updated);
+    // Keep custom split inputs clean and empty so user can freely type without unwanted pre-filled numbers
+    if (!editingExpense || editingExpense.splitType !== newType) {
+      setCustomSplits({});
     }
   };
 
