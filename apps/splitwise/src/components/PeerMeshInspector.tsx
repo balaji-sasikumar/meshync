@@ -321,7 +321,7 @@ export const PeerMeshInspector: React.FC<Props> = ({ kernel, status }) => {
                   type="text"
                   value={signalingInput}
                   onChange={(e) => setSignalingInput(e.target.value)}
-                  placeholder="e.g. wss://signaling.fly.dev or ws://localhost:4444"
+                  placeholder="e.g. wss://signaling.fly.dev or wss://y-webrtc-signaling.fly.dev"
                   className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
                 />
               </div>

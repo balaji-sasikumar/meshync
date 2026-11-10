@@ -32,11 +32,17 @@ interface PeerConnectionWrapper {
   isInitiator: boolean;
 }
 
+const isLocalhost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '0.0.0.0');
+
 const DEFAULT_SIGNALING_URLS = [
   'wss://signaling.fly.dev',
   'wss://y-webrtc-signaling.fly.dev',
   'wss://signaling.yjs.dev',
-  'ws://localhost:4444'
+  ...(isLocalhost ? ['ws://localhost:4444'] : [])
 ];
 
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
