@@ -6,14 +6,13 @@ import {
   WifiOff,
   ShieldCheck,
   HardDrive,
-  Globe,
   Download,
   Upload,
   Copy,
   Check,
-  RefreshCw,
   Users,
-  Settings
+  RotateCcw,
+  Plus
 } from 'lucide-react';
 import type { MeshKernel, MeshKernelStatus } from '@localfirst/mesh-sync';
 import type { SpaceMeta } from '../domain/schema.ts';
@@ -44,13 +43,6 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCid, setCopiedCid] = useState(false);
   const [newMember, setNewMember] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
-  const [signalingInput, setSignalingInput] = useState(() =>
-    typeof localStorage !== 'undefined' ? localStorage.getItem('mesh_custom_signaling_url') || '' : ''
-  );
-  const [pinningInput, setPinningInput] = useState(() =>
-    typeof localStorage !== 'undefined' ? localStorage.getItem('mesh_custom_pinning_endpoint') || '' : ''
-  );
 
   if (!isOpen) return null;
 
@@ -102,20 +94,6 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
       }
     };
     reader.readAsText(file);
-  };
-
-  const saveSettings = () => {
-    if (signalingInput.trim()) {
-      localStorage.setItem('mesh_custom_signaling_url', signalingInput.trim());
-    } else {
-      localStorage.removeItem('mesh_custom_signaling_url');
-    }
-    if (pinningInput.trim()) {
-      localStorage.setItem('mesh_custom_pinning_endpoint', pinningInput.trim());
-    } else {
-      localStorage.removeItem('mesh_custom_pinning_endpoint');
-    }
-    window.location.reload();
   };
 
   return (
@@ -274,52 +252,52 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
           </div>
         </div>
 
-        {/* Advanced Relay Settings Toggle */}
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+        {/* Space Actions: Start New Space & Reset Everything */}
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          {/* Create New Space */}
           <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="w-full text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 flex items-center justify-between py-1"
+            onClick={() => {
+              if (confirm('Create a brand new P2P bookmarks space with a new encrypted link?')) {
+                window.location.hash = '';
+                window.location.reload();
+              }
+            }}
+            className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
           >
-            <span className="flex items-center gap-1.5">
-              <Settings className="w-3.5 h-3.5" />
-              Custom Relays & Endpoints
-            </span>
-            <span>{showSettings ? '▲' : '▼'}</span>
+            <Plus className="w-3.5 h-3.5 text-sky-500" />
+            <span>Create New Space</span>
           </button>
-          {showSettings && (
-            <div className="mt-3 space-y-2.5">
-              <div>
-                <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">
-                  Signaling Relay Server (WebSocket)
-                </label>
-                <input
-                  type="text"
-                  value={signalingInput}
-                  onChange={e => setSignalingInput(e.target.value)}
-                  placeholder="wss://signaling.example.com"
-                  className="w-full px-3 py-1.5 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">
-                  IPFS Pinning Service (Kubo / Helia)
-                </label>
-                <input
-                  type="text"
-                  value={pinningInput}
-                  onChange={e => setPinningInput(e.target.value)}
-                  placeholder="https://api.pinata.cloud or local IPFS"
-                  className="w-full px-3 py-1.5 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:outline-none font-mono"
-                />
-              </div>
-              <button
-                onClick={saveSettings}
-                className="w-full py-1.5 px-3 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl transition"
-              >
-                Save & Reload Relay
-              </button>
-            </div>
-          )}
+
+          {/* 1-Click Reset Everything & Start Fresh */}
+          <button
+            onClick={() => {
+              if (confirm('Clear all local data and start fresh? This will wipe all IndexedDB stores, remove your stored user profiles, and load a clean workspace.')) {
+                localStorage.clear();
+                sessionStorage.clear();
+                if (typeof window !== 'undefined') {
+                  if (window.indexedDB && window.indexedDB.databases) {
+                    window.indexedDB.databases().then(dbs => {
+                      dbs.forEach(db => {
+                        if (db.name) window.indexedDB.deleteDatabase(db.name);
+                      });
+                      window.location.hash = '';
+                      window.location.reload();
+                    }).catch(() => {
+                      window.location.hash = '';
+                      window.location.reload();
+                    });
+                  } else {
+                    window.location.hash = '';
+                    window.location.reload();
+                  }
+                }
+              }
+            }}
+            className="w-full py-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset Everything & Start Fresh</span>
+          </button>
         </div>
       </div>
     </div>
