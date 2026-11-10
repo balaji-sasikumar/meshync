@@ -7,11 +7,27 @@ export function useMeshKernel(config?: MeshKernelConfig) {
   const [status, setStatus] = useState<MeshKernelStatus | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [currentHash, setCurrentHash] = useState(() =>
+    typeof window !== 'undefined' ? window.location.hash : ''
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleHashChange = () => {
+      setCurrentHash(window.location.hash);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
     let unsubStatus: (() => void) | undefined;
     let localKernel: MeshKernel | null = null;
+
+    setIsReady(false);
 
     MeshKernel.create(config)
       .then((k) => {
@@ -37,7 +53,7 @@ export function useMeshKernel(config?: MeshKernelConfig) {
       unsubStatus?.();
       localKernel?.destroy();
     };
-  }, []);
+  }, [currentHash]);
 
   return { kernel, status, isReady, error };
 }

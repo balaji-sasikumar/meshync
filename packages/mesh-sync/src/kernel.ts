@@ -3,7 +3,8 @@ import { deriveKey, computeWorkspaceFingerprint } from './crypto/cipher.js';
 import {
   parseHashCredentials,
   generateWorkspaceCredentials,
-  syncCredentialsToUrl
+  syncCredentialsToUrl,
+  getSavedActiveWorkspace
 } from './identity/credentials.js';
 import { CRDTDocManager } from './crdt/doc.js';
 import { IndexedDBStorageAdapter } from './storage/indexeddb-adapter.js';
@@ -123,6 +124,10 @@ export class MeshKernel {
   public static async create(config: MeshKernelConfig = {}): Promise<MeshKernel> {
     // 1. Resolve workspace credentials
     let creds = config.credentials || parseHashCredentials();
+    if (!creds) {
+      // Check device saved workspace before generating a brand new one
+      creds = getSavedActiveWorkspace();
+    }
     if (!creds) {
       creds = generateWorkspaceCredentials();
       if (config.autoSyncUrl !== false) {

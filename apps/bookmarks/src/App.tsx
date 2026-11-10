@@ -80,7 +80,6 @@ export const App: React.FC = () => {
   const handleSwitchWorkspace = (newHash: string) => {
     if (typeof window !== 'undefined') {
       window.location.hash = newHash;
-      window.location.reload();
     }
   };
 
