@@ -44,16 +44,25 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const handleAddMember = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMessage(null);
-    const trimmed = newMemberInput.trim();
-    if (!trimmed) return;
+    const raw = newMemberInput.trim();
+    if (!raw) return;
 
-    if (trimmed.toLowerCase() === 'you') {
-      setErrorMessage("Please enter an actual friend's name (e.g. Balaji, Alice), not 'You'.");
-      return;
+    // Support comma-separated entry (e.g. "Alex, Sam, Jordan")
+    const namesToAdd = raw.split(',').map(s => s.trim()).filter(Boolean);
+    const validNames: string[] = [];
+
+    for (const name of namesToAdd) {
+      if (name.toLowerCase() === 'you') {
+        setErrorMessage("Please enter actual member names, not 'You'.");
+        return;
+      }
+      if (!members.some(m => m.toLowerCase() === name.toLowerCase()) && !validNames.some(m => m.toLowerCase() === name.toLowerCase())) {
+        validNames.push(name);
+      }
     }
 
-    if (!members.some(m => m.toLowerCase() === trimmed.toLowerCase())) {
-      setMembers([...members, trimmed]);
+    if (validNames.length > 0) {
+      setMembers([...members, ...validNames]);
       setNewMemberInput('');
     }
   };
@@ -93,7 +102,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     if (!trimmed) return;
 
     if (trimmed.toLowerCase() === 'you') {
-      setErrorMessage("Please enter your actual name (e.g. Balaji), not 'You'.");
+      setErrorMessage("Please enter your actual name, not 'You'.");
       return;
     }
 
@@ -189,36 +198,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1">
-                  Member Names ({members.length})
-                </label>
-
-                {/* Member chips */}
-                <div className="flex flex-wrap gap-1.5 mb-2 min-h-[44px] max-h-28 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
-                  {members.length === 0 ? (
-                    <span className="text-xs text-slate-400 italic self-center">
-                      Type friends' names below (e.g. Balaji, Bob)...
-                    </span>
-                  ) : (
-                    members.map(name => {
-                      const color = getAvatarColor(name);
-                      return (
-                        <span
-                          key={name}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${color.lightBg} ${color.lightText}`}
-                        >
-                          <span>{name}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveMember(name)}
-                            className="hover:opacity-75 transition"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      );
-                    })
-                  )}
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                    Add Members
+                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    {members.length === 0 ? 'Min. 2 members' : `${members.length} added`}
+                  </span>
                 </div>
 
                 {/* Add member input */}
@@ -233,18 +219,43 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                         handleAddMember();
                       }
                     }}
-                    placeholder="Friend's name (e.g. Balaji)..."
-                    className="flex-1 px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white"
+                    placeholder="Enter member name..."
+                    className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white"
                   />
                   <button
                     type="button"
                     onClick={() => handleAddMember()}
                     disabled={!newMemberInput.trim()}
-                    className="px-3.5 py-1.5 bg-slate-800 dark:bg-slate-700 text-white rounded-xl text-xs font-bold hover:bg-slate-900 disabled:opacity-40 transition"
+                    className="px-3.5 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-xs font-bold disabled:opacity-40 transition active:scale-95 shadow-sm"
                   >
                     + Add
                   </button>
                 </div>
+
+                {/* Added Member tags directly below input (only shown when members exist) */}
+                {members.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2.5 max-h-28 overflow-y-auto">
+                    {members.map(name => {
+                      const color = getAvatarColor(name);
+                      return (
+                        <span
+                          key={name}
+                          className={`inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-bold ${color.lightBg} ${color.lightText} border border-slate-200/60 dark:border-slate-700`}
+                        >
+                          <span>{name}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMember(name)}
+                            className="p-0.5 rounded-full hover:bg-black/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
+                            title={`Remove ${name}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <button
@@ -356,7 +367,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     autoFocus
                     value={customNameInput}
                     onChange={e => setCustomNameInput(e.target.value)}
-                    placeholder="Enter your name (e.g. Balaji)..."
+                    placeholder="Enter your name..."
                     className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white"
                   />
                 </div>
