@@ -33,9 +33,10 @@ interface PeerConnectionWrapper {
 }
 
 const DEFAULT_SIGNALING_URLS = [
-  'ws://localhost:4444',
   'wss://signaling.fly.dev',
-  'wss://signaling.yjs.dev'
+  'wss://y-webrtc-signaling.fly.dev',
+  'wss://signaling.yjs.dev',
+  'ws://localhost:4444'
 ];
 
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
@@ -58,9 +59,18 @@ export class WebRTCMeshTransport {
   constructor(private options: WebRTCMeshOptions) {
     this.peerId = this.generatePeerId();
 
+    const userCustom =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem('mesh_custom_signaling_url')
+        : null;
+
+    const fallbackList = userCustom
+      ? [userCustom, ...DEFAULT_SIGNALING_URLS]
+      : DEFAULT_SIGNALING_URLS;
+
     const signalingUrls = options.signalingUrls?.length
       ? options.signalingUrls
-      : DEFAULT_SIGNALING_URLS;
+      : fallbackList;
 
     this.signaling = new MultiBrokerSignaling({
       urls: signalingUrls,

@@ -79,7 +79,15 @@ export class IPFSRelayEngine {
       'https://dweb.link/ipfs/',
       'https://gateway.pinata.cloud/ipfs/'
     ];
-    this.pinningEndpoints = options.pinningEndpoints ?? [];
+    const userCustomPinning =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem('mesh_custom_pinning_endpoint')
+        : null;
+
+    const basePinning = options.pinningEndpoints ?? [];
+    this.pinningEndpoints = userCustomPinning
+      ? [userCustomPinning, ...basePinning]
+      : basePinning;
 
     this.init();
   }
