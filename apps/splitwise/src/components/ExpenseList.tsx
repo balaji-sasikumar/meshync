@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Trash2, Search, Receipt, Edit2, Filter } from 'lucide-react';
-import type { Expense } from '../domain/schema.ts';
+import { Trash2, Search, Receipt, Edit2, MoreVertical } from 'lucide-react';
+import type { Expense, GroupMeta } from '../domain/schema.ts';
 import { isSettlementItem } from '../domain/schema.ts';
 import {
   CATEGORY_INFO,
@@ -8,6 +8,7 @@ import {
   getCurrencySymbol,
   formatTimeAgo
 } from '../domain/ui-helpers.ts';
+import { ExpenseDetailModal } from './ExpenseDetailModal.tsx';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -15,6 +16,7 @@ interface ExpenseListProps {
   onEditExpense: (expense: Expense) => void;
   onOpenAddExpense: () => void;
   currentUserName: string;
+  groupMeta: GroupMeta | null;
 }
 
 export const ExpenseList: React.FC<ExpenseListProps> = ({
@@ -22,11 +24,14 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   onDeleteExpense,
   onEditExpense,
   onOpenAddExpense,
-  currentUserName
+  currentUserName,
+  groupMeta
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedMember, setSelectedMember] = useState<string>('ALL');
+  const [selectedExpenseForDetail, setSelectedExpenseForDetail] = useState<Expense | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   // Strictly filter out any settlement records from the Bills list
   const genuineExpenses = expenses.filter(e => !isSettlementItem(e));
@@ -72,7 +77,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
         </span>
       </div>
 
-      {/* Search Bar */}
+      {/* Search & Member Filter */}
       {genuineExpenses.length > 2 && (
         <div className="space-y-2 mb-3">
           <div className="relative">
@@ -86,7 +91,6 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
             />
           </div>
 
-          {/* Member Filter Chips */}
           {allMembers.length > 1 && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
               <button
@@ -135,7 +139,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           </button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {filteredExpenses.map(expense => {
             const catInfo = CATEGORY_INFO[expense.category] || CATEGORY_INFO['General'];
             const symbol = getCurrencySymbol(expense.currency);
@@ -152,67 +156,67 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
             let personalAmount = 0;
 
             if (isPayer) {
-              // User paid total bill. Net amount they lent to other members:
               personalAmount = isParticipant
                 ? expense.amount - splitPerPerson
                 : expense.amount;
               personalType = personalAmount > 0 ? 'lent' : 'none';
             } else if (isParticipant) {
-              // User owes their share to the payer
               personalAmount = splitPerPerson;
               personalType = 'share';
             }
 
+            const isMenuOpen = activeMenuId === expense.id;
+
             return (
               <div
                 key={expense.id}
-                className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all flex items-center justify-between group"
+                onClick={() => setSelectedExpenseForDetail(expense)}
+                className="bg-white dark:bg-slate-900 rounded-2xl p-3 sm:p-3.5 border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all flex items-center justify-between cursor-pointer active:scale-[0.99] relative group"
               >
-                {/* Left: Category Icon & Details */}
-                <div className="flex items-center gap-3 min-w-0">
+                {/* Left: Category Icon & Title + Clean Subtitle */}
+                <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
                   <div
-                    className={`w-10 h-10 rounded-xl ${catInfo.bg} flex items-center justify-center text-lg shadow-inner shrink-0`}
+                    className={`w-11 h-11 rounded-2xl ${catInfo.bg} flex items-center justify-center text-xl shadow-inner shrink-0`}
                   >
                     {catInfo.emoji}
                   </div>
 
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-snug truncate">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-sm font-extrabold text-slate-900 dark:text-white leading-tight truncate">
                       {expense.description}
                     </h4>
 
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                    {/* Clean spacious subtitle */}
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500 mt-1">
                       <span>{formatTimeAgo(expense.timestamp)}</span>
                       <span>•</span>
-                      <span>{count} {count === 1 ? 'member' : 'members'}</span>
-                      <span>•</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      <span className="font-semibold text-slate-600 dark:text-slate-300 truncate">
                         Paid by {expense.payer}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Right: Personal Credit/Debit and Actions */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <div className="text-right mr-1">
+                {/* Right: Personal Credit/Debit and 3-Dot Menu */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-right">
                     {personalType === 'lent' && (
-                      <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                      <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono leading-tight">
                         +{symbol}{personalAmount.toFixed(2)}
                       </p>
                     )}
                     {personalType === 'share' && (
-                      <p className="text-xs font-black text-rose-600 dark:text-rose-400 font-mono">
+                      <p className="text-sm font-black text-rose-600 dark:text-rose-400 font-mono leading-tight">
                         -{symbol}{personalAmount.toFixed(2)}
                       </p>
                     )}
                     {personalType === 'none' && (
-                      <p className="text-xs font-bold text-slate-400 dark:text-slate-500">
+                      <p className="text-xs font-bold text-slate-500 dark:text-slate-400 leading-tight">
                         {symbol}{Number(expense.amount).toFixed(2)}
                       </p>
                     )}
 
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
                       {personalType === 'lent'
                         ? 'you lent'
                         : personalType === 'share'
@@ -221,33 +225,76 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                     </p>
                   </div>
 
-                  {/* Edit Button */}
-                  <button
-                    onClick={() => onEditExpense(expense)}
-                    title="Edit bill"
-                    className="p-1.5 rounded-lg text-slate-300 dark:text-slate-600 hover:text-sky-500 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition opacity-0 group-hover:opacity-100"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
+                  {/* 3-Dot Vertical Menu (Replaces Edit & Delete icons) */}
+                  <div className="relative">
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        setActiveMenuId(isMenuOpen ? null : expense.id);
+                      }}
+                      title="More actions"
+                      className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
 
-                  {/* Delete Button */}
-                  <button
-                    onClick={() => {
-                      if (confirm(`Delete "${expense.description}"?`)) {
-                        onDeleteExpense(expense.id);
-                      }
-                    }}
-                    title="Delete bill"
-                    className="p-1.5 rounded-lg text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                    {/* Dropdown Menu */}
+                    {isMenuOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-20 cursor-default"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setActiveMenuId(null);
+                          }}
+                        />
+                        <div
+                          onClick={e => e.stopPropagation()}
+                          className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 z-30 animate-in fade-in zoom-in-95 duration-100"
+                        >
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              onEditExpense(expense);
+                            }}
+                            className="w-full px-3 py-1.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-sky-500" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              if (confirm(`Delete "${expense.description}"?`)) {
+                                onDeleteExpense(expense.id);
+                              }
+                            }}
+                            className="w-full px-3 py-1.5 text-left text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* Expense Detail Breakdown Modal (Shows details on card click) */}
+      <ExpenseDetailModal
+        expense={selectedExpenseForDetail}
+        isOpen={Boolean(selectedExpenseForDetail)}
+        onClose={() => setSelectedExpenseForDetail(null)}
+        onEdit={onEditExpense}
+        onDelete={onDeleteExpense}
+        currentUserName={currentUserName}
+        groupMeta={groupMeta}
+      />
     </div>
   );
 };

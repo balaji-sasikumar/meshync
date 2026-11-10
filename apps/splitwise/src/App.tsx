@@ -366,6 +366,7 @@ export const App: React.FC = () => {
               onEditExpense={handleOpenEditExpense}
               onOpenAddExpense={handleOpenAddExpense}
               currentUserName={currentUserName}
+              groupMeta={groupMeta}
             />
           ) : (
             <DebtSettlementView
