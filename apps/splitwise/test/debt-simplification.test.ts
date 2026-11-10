@@ -149,4 +149,73 @@ describe('Debt Simplification & Cash-Flow Minimization', () => {
     assert.equal(balances.find(b => b.person === 'Balaji')!.balance, 0);
     assert.equal(balances.find(b => b.person === 'Bob')!.balance, 0);
   });
+
+  test('calculates net balances for exact amount split', () => {
+    const expenses: Expense[] = [
+      {
+        id: 'e_exact',
+        description: 'Groceries with custom amounts',
+        amount: 100,
+        currency: 'INR',
+        payer: 'Alice',
+        participants: ['Alice', 'Bob', 'Charlie'],
+        splitType: 'EXACT',
+        customSplits: {
+          Alice: 20,
+          Bob: 30,
+          Charlie: 50
+        },
+        timestamp: 10,
+        category: 'Groceries'
+      }
+    ];
+
+    const balances = calculateNetBalances(expenses).get('INR')!;
+    // Alice paid 100, owes 20 => net +80
+    assert.equal(balances.get('Alice'), 80);
+    // Bob owes 30 => net -30
+    assert.equal(balances.get('Bob'), -30);
+    // Charlie owes 50 => net -50
+    assert.equal(balances.get('Charlie'), -50);
+
+    const { settlementsByCurrency } = computeAllSettlements(expenses);
+    const settlements = settlementsByCurrency.get('INR')!;
+    assert.equal(settlements.length, 2);
+    // Charlie pays Alice 50, Bob pays Alice 30
+    assert.ok(settlements.some(s => s.from === 'Charlie' && s.to === 'Alice' && s.amount === 50));
+    assert.ok(settlements.some(s => s.from === 'Bob' && s.to === 'Alice' && s.amount === 30));
+  });
+
+  test('calculates net balances for percentage split', () => {
+    const expenses: Expense[] = [
+      {
+        id: 'e_pct',
+        description: 'Dinner with percentage split',
+        amount: 200,
+        currency: 'USD',
+        payer: 'Bob',
+        participants: ['Alice', 'Bob'],
+        splitType: 'PERCENTAGE',
+        customSplits: {
+          Alice: 40,
+          Bob: 60
+        },
+        timestamp: 20,
+        category: 'Food & Dining'
+      }
+    ];
+
+    const balances = calculateNetBalances(expenses).get('USD')!;
+    // Bob paid 200, owes 60% of 200 = 120 => net +80
+    assert.equal(balances.get('Bob'), 80);
+    // Alice owes 40% of 200 = 80 => net -80
+    assert.equal(balances.get('Alice'), -80);
+
+    const { settlementsByCurrency } = computeAllSettlements(expenses);
+    const settlements = settlementsByCurrency.get('USD')!;
+    assert.equal(settlements.length, 1);
+    assert.equal(settlements[0].from, 'Alice');
+    assert.equal(settlements[0].to, 'Bob');
+    assert.equal(settlements[0].amount, 80);
+  });
 });

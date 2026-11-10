@@ -42,12 +42,30 @@ export function calculateNetBalances(
     // Credit payer for the total amount paid
     balances.set(payer, (balances.get(payer) || 0) + exp.amount);
 
-    // Debit each participant for their equal share
-    const share = exp.amount / exp.participants.length;
-    for (const p of exp.participants) {
-      const participant = p.trim();
-      if (!participant) continue;
-      balances.set(participant, (balances.get(participant) || 0) - share);
+    // Debit each participant for their share (Equal, Exact, or Percentage)
+    if (exp.splitType === 'EXACT' && exp.customSplits) {
+      for (const p of exp.participants) {
+        const participant = p.trim();
+        if (!participant) continue;
+        const exactShare = Number(exp.customSplits[participant]) || 0;
+        balances.set(participant, (balances.get(participant) || 0) - exactShare);
+      }
+    } else if (exp.splitType === 'PERCENTAGE' && exp.customSplits) {
+      for (const p of exp.participants) {
+        const participant = p.trim();
+        if (!participant) continue;
+        const pct = Number(exp.customSplits[participant]) || 0;
+        const pctShare = (exp.amount * pct) / 100;
+        balances.set(participant, (balances.get(participant) || 0) - pctShare);
+      }
+    } else {
+      // Default: Equal split
+      const share = exp.amount / exp.participants.length;
+      for (const p of exp.participants) {
+        const participant = p.trim();
+        if (!participant) continue;
+        balances.set(participant, (balances.get(participant) || 0) - share);
+      }
     }
   }
 

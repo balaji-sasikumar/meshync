@@ -16,6 +16,8 @@ export interface SettlementRecord {
   note?: string;
 }
 
+export type SplitType = 'EQUAL' | 'EXACT' | 'PERCENTAGE';
+
 export interface Expense {
   id: string;
   description: string;
@@ -26,6 +28,8 @@ export interface Expense {
   timestamp: number;
   category: string;
   note?: string;
+  splitType?: SplitType;
+  customSplits?: Record<string, number>; // EXACT: person -> amount; PERCENTAGE: person -> percent
 }
 
 export interface NetBalance {

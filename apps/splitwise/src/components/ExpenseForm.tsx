@@ -9,7 +9,8 @@ import {
   SUPPORTED_CURRENCIES,
   SupportedCurrency,
   Expense,
-  GroupMeta
+  GroupMeta,
+  SplitType
 } from '../domain/schema.ts';
 import {
   CATEGORY_INFO,
@@ -47,6 +48,8 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
   const [participants, setParticipants] = useState<string[]>(members);
   const [category, setCategory] = useState<string>('Food & Dining');
   const [note, setNote] = useState('');
+  const [splitType, setSplitType] = useState<SplitType>('EQUAL');
+  const [customSplits, setCustomSplits] = useState<Record<string, string>>({});
 
   // Pre-fill fields if editing an existing expense or reset for new expense
   useEffect(() => {
@@ -59,6 +62,16 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
         setParticipants(editingExpense.participants);
         setCategory(editingExpense.category || 'Food & Dining');
         setNote(editingExpense.note || '');
+        setSplitType(editingExpense.splitType || 'EQUAL');
+        if (editingExpense.customSplits) {
+          const strMap: Record<string, string> = {};
+          for (const [k, v] of Object.entries(editingExpense.customSplits)) {
+            strMap[k] = v.toString();
+          }
+          setCustomSplits(strMap);
+        } else {
+          setCustomSplits({});
+        }
       } else {
         const activeCurrency = (groupMeta?.currency as SupportedCurrency) || 'INR';
         setDescription('');
@@ -67,6 +80,8 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
         setParticipants(members);
         setCategory('Food & Dining');
         setNote('');
+        setSplitType('EQUAL');
+        setCustomSplits({});
         if (currentUserName && members.includes(currentUserName)) {
           setPayer(currentUserName);
         } else if (members.length > 0) {
@@ -77,6 +92,78 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
   }, [isOpen, editingExpense, groupMeta?.currency, groupMeta?.members, currentUserName]);
 
   if (!isOpen) return null;
+
+  const totalAmount = parseFloat(amount) || 0;
+
+  // Exact mode calculations
+  const exactAllocated = participants.reduce((sum, p) => sum + (parseFloat(customSplits[p]) || 0), 0);
+  const exactRemaining = Math.round((totalAmount - exactAllocated) * 100) / 100;
+
+  // Percentage mode calculations
+  const percentAllocated = participants.reduce((sum, p) => sum + (parseFloat(customSplits[p]) || 0), 0);
+  const percentRemaining = Math.round((100 - percentAllocated) * 10) / 10;
+
+  const handleSwitchSplitType = (newType: SplitType) => {
+    setSplitType(newType);
+    if (newType === 'EXACT') {
+      const updated: Record<string, string> = {};
+      const count = participants.length || 1;
+      const base = totalAmount > 0 ? (totalAmount / count).toFixed(2) : '';
+      for (const p of participants) {
+        updated[p] = customSplits[p] || base;
+      }
+      setCustomSplits(updated);
+    } else if (newType === 'PERCENTAGE') {
+      const updated: Record<string, string> = {};
+      const count = participants.length || 1;
+      const base = (100 / count).toFixed(1);
+      for (const p of participants) {
+        updated[p] = customSplits[p] || base;
+      }
+      setCustomSplits(updated);
+    }
+  };
+
+  const handleCustomSplitChange = (person: string, val: string) => {
+    setCustomSplits(prev => ({
+      ...prev,
+      [person]: val
+    }));
+  };
+
+  const handleAutoFillRemaining = () => {
+    if (totalAmount <= 0 || participants.length === 0) return;
+
+    if (splitType === 'EXACT') {
+      if (exactRemaining <= 0) return;
+      const unassigned = participants.filter(p => !parseFloat(customSplits[p]));
+      const targets = unassigned.length > 0 ? unassigned : participants;
+      const share = Math.floor((exactRemaining / targets.length) * 100) / 100;
+      const remainder = Math.round((exactRemaining - (share * targets.length)) * 100) / 100;
+
+      const updated = { ...customSplits };
+      targets.forEach((p, idx) => {
+        const extra = idx === 0 ? remainder : 0;
+        const current = unassigned.length > 0 ? 0 : (parseFloat(customSplits[p]) || 0);
+        updated[p] = (current + share + extra).toFixed(2);
+      });
+      setCustomSplits(updated);
+    } else if (splitType === 'PERCENTAGE') {
+      if (percentRemaining <= 0) return;
+      const unassigned = participants.filter(p => !parseFloat(customSplits[p]));
+      const targets = unassigned.length > 0 ? unassigned : participants;
+      const share = Math.floor((percentRemaining / targets.length) * 10) / 10;
+      const remainder = Math.round((percentRemaining - (share * targets.length)) * 10) / 10;
+
+      const updated = { ...customSplits };
+      targets.forEach((p, idx) => {
+        const extra = idx === 0 ? remainder : 0;
+        const current = unassigned.length > 0 ? 0 : (parseFloat(customSplits[p]) || 0);
+        updated[p] = (current + share + extra).toFixed(1);
+      });
+      setCustomSplits(updated);
+    }
+  };
 
   const handleToggleParticipant = (person: string) => {
     if (participants.includes(person)) {
@@ -97,21 +184,43 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
     setParticipants([payer]);
   };
 
+  const isFormValid = Boolean(
+    description.trim() &&
+    totalAmount > 0 &&
+    participants.length > 0 &&
+    (splitType === 'EQUAL' ||
+      (splitType === 'EXACT' && Math.abs(exactRemaining) < 0.01) ||
+      (splitType === 'PERCENTAGE' && Math.abs(percentRemaining) < 0.1))
+  );
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) return;
-    if (!description.trim() || participants.length === 0) return;
+    if (!isFormValid) return;
+
+    let finalCustomSplits: Record<string, number> | undefined = undefined;
+    if (splitType === 'EXACT') {
+      finalCustomSplits = {};
+      for (const p of participants) {
+        finalCustomSplits[p] = parseFloat(customSplits[p]) || 0;
+      }
+    } else if (splitType === 'PERCENTAGE') {
+      finalCustomSplits = {};
+      for (const p of participants) {
+        finalCustomSplits[p] = parseFloat(customSplits[p]) || 0;
+      }
+    }
 
     onSubmit(
       {
         description: description.trim(),
-        amount: parsedAmount,
+        amount: totalAmount,
         currency,
         payer,
         participants,
         category,
         note: note.trim() || undefined,
+        splitType,
+        customSplits: finalCustomSplits,
         timestamp: editingExpense ? editingExpense.timestamp : Date.now()
       },
       editingExpense ? editingExpense.id : undefined
@@ -266,12 +375,54 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
             </div>
           </div>
 
-          {/* Split Between with Checkboxes */}
+          {/* Split Method Segmented Control */}
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-2">
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Split Between ({participants.length} selected)
+                Split Method
               </label>
+              <div className="inline-flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => handleSwitchSplitType('EQUAL')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                    splitType === 'EQUAL'
+                      ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  = Equal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchSplitType('EXACT')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                    splitType === 'EXACT'
+                      ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {getCurrencySymbol(currency)} Exact
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchSplitType('PERCENTAGE')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                    splitType === 'PERCENTAGE'
+                      ? 'bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  % Percent
+                </button>
+              </div>
+            </div>
+
+            {/* Sub-header: selected count & Select All / Clear */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Members ({participants.length} of {members.length})
+              </span>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -291,21 +442,114 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
               </div>
             </div>
 
-            {/* Checkbox List of Members */}
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+            {/* Member List according to Split Mode */}
+            <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
               {members.map(person => {
                 const isChecked = participants.includes(person);
                 const color = getAvatarColor(person);
+
+                if (splitType === 'EQUAL') {
+                  const equalShare = totalAmount > 0 && participants.length > 0
+                    ? (totalAmount / participants.length).toFixed(2)
+                    : '0.00';
+
+                  return (
+                    <label
+                      key={person}
+                      className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer select-none transition-all ${
+                        isChecked
+                          ? 'bg-sky-50/70 dark:bg-sky-950/30 border-sky-300 dark:border-sky-800'
+                          : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/50 opacity-60 hover:opacity-90'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleParticipant(person)}
+                          className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 dark:border-slate-600 cursor-pointer"
+                        />
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${color.bg} ${color.text}`}
+                        >
+                          {person.substring(0, 2).toUpperCase()}
+                        </div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {person}
+                        </span>
+                      </div>
+
+                      {isChecked && totalAmount > 0 && (
+                        <span className="text-xs font-bold text-sky-600 dark:text-sky-400 font-mono">
+                          {getCurrencySymbol(currency)}{equalShare}
+                        </span>
+                      )}
+                    </label>
+                  );
+                }
+
+                if (splitType === 'EXACT') {
+                  return (
+                    <div
+                      key={person}
+                      className={`flex items-center justify-between p-2 rounded-xl border transition-all ${
+                        isChecked
+                          ? 'bg-sky-50/50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-800'
+                          : 'bg-slate-50/60 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleParticipant(person)}
+                          className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 dark:border-slate-600 cursor-pointer"
+                        />
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${color.bg} ${color.text}`}
+                        >
+                          {person.substring(0, 2).toUpperCase()}
+                        </div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[90px]">
+                          {person}
+                        </span>
+                      </div>
+
+                      <div className="relative w-28">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                          {getCurrencySymbol(currency)}
+                        </span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          disabled={!isChecked}
+                          value={customSplits[person] || ''}
+                          onChange={e => handleCustomSplitChange(person, e.target.value)}
+                          placeholder="0.00"
+                          className="w-full pl-6 pr-2 py-1 text-right text-xs font-extrabold font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-40 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+
+                // PERCENTAGE split mode
+                const memberPct = parseFloat(customSplits[person]) || 0;
+                const calculatedShare = totalAmount > 0
+                  ? ((totalAmount * memberPct) / 100).toFixed(2)
+                  : '0.00';
+
                 return (
-                  <label
+                  <div
                     key={person}
-                    className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer select-none transition-all ${
+                    className={`flex items-center justify-between p-2 rounded-xl border transition-all ${
                       isChecked
-                        ? 'bg-sky-50/70 dark:bg-sky-950/30 border-sky-300 dark:border-sky-800'
-                        : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/50 opacity-60 hover:opacity-90'
+                        ? 'bg-sky-50/50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-800'
+                        : 'bg-slate-50/60 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800 opacity-60'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={isChecked}
@@ -317,32 +561,140 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
                       >
                         {person.substring(0, 2).toUpperCase()}
                       </div>
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[90px]">
                         {person}
                       </span>
                     </div>
 
-                    {isChecked && parseFloat(amount) > 0 && (
-                      <span className="text-xs font-bold text-sky-600 dark:text-sky-400 font-mono">
-                        {getCurrencySymbol(currency)}{splitAmount}
-                      </span>
-                    )}
-                  </label>
+                    <div className="flex items-center gap-1.5">
+                      {totalAmount > 0 && isChecked && (
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {getCurrencySymbol(currency)}{calculatedShare}
+                        </span>
+                      )}
+                      <div className="relative w-20">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          disabled={!isChecked}
+                          value={customSplits[person] || ''}
+                          onChange={e => handleCustomSplitChange(person, e.target.value)}
+                          placeholder="0"
+                          className="w-full pr-5 pl-2 py-1 text-right text-xs font-extrabold font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-40 dark:text-white"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
             </div>
 
-            {/* Split Summary Footer */}
-            {parseFloat(amount) > 0 && participants.length > 0 && (
-              <div className="mt-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-center text-xs font-semibold text-slate-600 dark:text-slate-300">
-                Split equally: <span className="font-extrabold text-slate-900 dark:text-white">{getCurrencySymbol(currency)}{splitAmount}</span> / person ({participants.length} people)
+            {/* Split Summary / Remaining Feedback Below */}
+            {splitType === 'EQUAL' && totalAmount > 0 && participants.length > 0 && (
+              <div className="mt-2.5 p-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-center text-xs font-semibold text-slate-600 dark:text-slate-300">
+                Split equally: <span className="font-extrabold text-slate-900 dark:text-white">{getCurrencySymbol(currency)}{(totalAmount / participants.length).toFixed(2)}</span> / person ({participants.length} people)
+              </div>
+            )}
+
+            {splitType === 'EXACT' && totalAmount > 0 && (
+              <div className={`mt-2.5 p-2.5 rounded-xl border transition-all text-xs ${
+                Math.abs(exactRemaining) < 0.01
+                  ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                  : exactRemaining > 0
+                  ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300'
+                  : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">
+                    Allocated: <strong className="font-mono">{getCurrencySymbol(currency)}{exactAllocated.toFixed(2)}</strong> of <strong className="font-mono">{getCurrencySymbol(currency)}{totalAmount.toFixed(2)}</strong>
+                  </span>
+
+                  {Math.abs(exactRemaining) < 0.01 ? (
+                    <span className="inline-flex items-center gap-1 font-extrabold text-emerald-600 dark:text-emerald-400">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>✓ Exact match</span>
+                    </span>
+                  ) : exactRemaining > 0 ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-extrabold font-mono text-amber-600 dark:text-amber-400">
+                        {getCurrencySymbol(currency)}{exactRemaining.toFixed(2)} left
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAutoFillRemaining}
+                        className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-lg text-[10px] font-bold shadow-sm transition"
+                      >
+                        Auto-fill
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="font-extrabold font-mono text-rose-600 dark:text-rose-400">
+                      +{getCurrencySymbol(currency)}{Math.abs(exactRemaining).toFixed(2)} over
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {splitType === 'PERCENTAGE' && totalAmount > 0 && (
+              <div className={`mt-2.5 p-2.5 rounded-xl border transition-all text-xs ${
+                Math.abs(percentRemaining) < 0.1
+                  ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                  : percentRemaining > 0
+                  ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300'
+                  : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">
+                    Allocated: <strong className="font-mono">{percentAllocated.toFixed(1)}%</strong> of 100%
+                  </span>
+
+                  {Math.abs(percentRemaining) < 0.1 ? (
+                    <span className="inline-flex items-center gap-1 font-extrabold text-emerald-600 dark:text-emerald-400">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>✓ 100% matched</span>
+                    </span>
+                  ) : percentRemaining > 0 ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-extrabold font-mono text-amber-600 dark:text-amber-400">
+                        {percentRemaining.toFixed(1)}% left ({getCurrencySymbol(currency)}{((totalAmount * percentRemaining) / 100).toFixed(2)})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAutoFillRemaining}
+                        className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-lg text-[10px] font-bold shadow-sm transition"
+                      >
+                        Auto-fill
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="font-extrabold font-mono text-rose-600 dark:text-rose-400">
+                      +{Math.abs(percentRemaining).toFixed(1)}% over
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
+          {/* Validation helper alert */}
+          {!isFormValid && totalAmount > 0 && description.trim() && (
+            <p className="text-[11px] text-center font-bold text-amber-600 dark:text-amber-400 animate-in fade-in">
+              {splitType === 'EXACT' && exactRemaining > 0.01 && `Allocate remaining ${getCurrencySymbol(currency)}${exactRemaining.toFixed(2)} to save`}
+              {splitType === 'EXACT' && exactRemaining < -0.01 && `Allocated sum exceeds total by ${getCurrencySymbol(currency)}${Math.abs(exactRemaining).toFixed(2)}`}
+              {splitType === 'PERCENTAGE' && percentRemaining > 0.1 && `Total percentage must equal 100% (${percentRemaining.toFixed(1)}% remaining)`}
+              {splitType === 'PERCENTAGE' && percentRemaining < -0.1 && `Total percentage exceeds 100% by ${Math.abs(percentRemaining).toFixed(1)}%`}
+            </p>
+          )}
+
           <button
             type="submit"
-            disabled={!description.trim() || !amount || participants.length === 0}
+            disabled={!isFormValid}
             className="w-full py-2.5 bg-sky-500 hover:bg-sky-600 active:scale-[0.98] text-white font-extrabold rounded-xl shadow-lg shadow-sky-500/25 transition flex items-center justify-center gap-2 disabled:opacity-50 mt-1"
           >
             <Check className="w-4 h-4" />

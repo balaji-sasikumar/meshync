@@ -144,7 +144,11 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
             const catInfo = CATEGORY_INFO[expense.category] || CATEGORY_INFO['General'];
             const symbol = getCurrencySymbol(expense.currency);
             const count = expense.participants.length || 1;
-            const splitPerPerson = expense.amount / count;
+            const userOwedShare = (expense.splitType === 'EXACT' && expense.customSplits && expense.customSplits[currentUserName] !== undefined)
+              ? Number(expense.customSplits[currentUserName]) || 0
+              : (expense.splitType === 'PERCENTAGE' && expense.customSplits && expense.customSplits[currentUserName] !== undefined)
+              ? (expense.amount * (Number(expense.customSplits[currentUserName]) || 0)) / 100
+              : (expense.amount / count);
 
             // Accurate personal credit / share calculation for the current user
             const isPayer = expense.payer.toLowerCase() === currentUserName.toLowerCase();
@@ -157,11 +161,11 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
 
             if (isPayer) {
               personalAmount = isParticipant
-                ? expense.amount - splitPerPerson
+                ? expense.amount - userOwedShare
                 : expense.amount;
               personalType = personalAmount > 0 ? 'lent' : 'none';
             } else if (isParticipant) {
-              personalAmount = splitPerPerson;
+              personalAmount = userOwedShare;
               personalType = 'share';
             }
 

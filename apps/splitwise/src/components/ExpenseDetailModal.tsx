@@ -35,6 +35,16 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   const splitAmount = expense.amount / count;
   const payerColor = getAvatarColor(expense.payer);
 
+  const getParticipantShare = (p: string): number => {
+    if (expense.splitType === 'EXACT' && expense.customSplits && expense.customSplits[p] !== undefined) {
+      return Number(expense.customSplits[p]) || 0;
+    }
+    if (expense.splitType === 'PERCENTAGE' && expense.customSplits && expense.customSplits[p] !== undefined) {
+      return (expense.amount * (Number(expense.customSplits[p]) || 0)) / 100;
+    }
+    return expense.amount / count;
+  };
+
   const formattedDate = new Date(expense.timestamp).toLocaleDateString(undefined, {
     weekday: 'short',
     year: 'numeric',
@@ -121,17 +131,29 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              Split Breakdown ({expense.participants.length} members)
+              Split Breakdown ({expense.participants.length} members • {
+                expense.splitType === 'EXACT'
+                  ? 'Exact'
+                  : expense.splitType === 'PERCENTAGE'
+                  ? 'Percent'
+                  : 'Equal'
+              })
             </label>
-            <span className="text-[10px] text-slate-400 font-medium">
-              {symbol}{splitAmount.toFixed(2)} / member
-            </span>
+            {(!expense.splitType || expense.splitType === 'EQUAL') && (
+              <span className="text-[10px] text-slate-400 font-medium">
+                {symbol}{splitAmount.toFixed(2)} / member
+              </span>
+            )}
           </div>
 
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {expense.participants.map(p => {
               const pColor = getAvatarColor(p);
-              const isPayer = p.toLowerCase() === expense.payer.toLowerCase();
+              const pShare = getParticipantShare(p);
+              const pPct = expense.splitType === 'PERCENTAGE' && expense.customSplits?.[p] !== undefined
+                ? expense.customSplits[p]
+                : null;
+
               return (
                 <div
                   key={p}
@@ -148,9 +170,16 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                     </span>
                   </div>
 
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono">
-                    {symbol}{splitAmount.toFixed(2)}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono">
+                      {symbol}{pShare.toFixed(2)}
+                    </span>
+                    {pPct !== null && (
+                      <span className="text-[10px] text-slate-400 block -mt-0.5 font-mono">
+                        {pPct}%
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
