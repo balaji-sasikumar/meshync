@@ -4,8 +4,8 @@ import {
   calculateNetBalances,
   simplifyDebtsForCurrency,
   computeAllSettlements
-} from '../src/domain/debt-simplification.ts';
-import type { Expense } from '../src/domain/schema.ts';
+} from '../src/domain/debt-simplification.js';
+import type { Expense } from '../src/domain/schema.js';
 
 describe('Debt Simplification & Cash-Flow Minimization', () => {
   test('calculates net balances for equal split', () => {
