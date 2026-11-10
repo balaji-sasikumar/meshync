@@ -4,8 +4,7 @@ import {
   Share2,
   Check,
   Sun,
-  Moon,
-  Plus
+  Moon
 } from 'lucide-react';
 import type { MeshKernel, MeshKernelStatus } from '@localfirst/mesh-sync';
 import type { SpaceMeta } from '../domain/schema.ts';
@@ -20,7 +19,6 @@ interface HeaderProps {
   onToggleTheme: () => void;
   onOpenMeshModal: () => void;
   onOpenSwitchUser: () => void;
-  onAddBookmark: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,8 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   isDark,
   onToggleTheme,
   onOpenMeshModal,
-  onOpenSwitchUser,
-  onAddBookmark
+  onOpenSwitchUser
 }) => {
   const [copied, setCopied] = useState(false);
   const userColor = getAvatarColor(currentUserName || 'Friend');
@@ -45,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="px-4 pt-4 pb-2.5 flex items-center justify-between">
+    <header className="px-4 pt-3.5 pb-2 flex items-center justify-between">
       {/* User Greeting & Space Title */}
       <div>
         <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -100,15 +97,6 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <Share2 className="w-4 h-4" />
           )}
-        </button>
-
-        {/* Quick Add Link Button */}
-        <button
-          onClick={onAddBookmark}
-          title="Add New Link"
-          className="p-1.5 rounded-full bg-sky-500 hover:bg-sky-600 text-white transition shadow-sm active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
         </button>
 
         {/* User Profile Avatar */}

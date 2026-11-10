@@ -52,8 +52,8 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
     <div
       className={`bg-white dark:bg-slate-900 border rounded-2xl p-3 sm:p-3.5 transition-all shadow-sm hover:shadow-md relative group ${
         bookmark.pinned
-          ? 'border-amber-300/80 dark:border-amber-600/40 bg-gradient-to-r from-amber-500/[0.03] to-transparent'
-          : 'border-slate-200/70 dark:border-slate-800'
+          ? 'border-amber-300 dark:border-amber-500/40 bg-amber-500/[0.02]'
+          : 'border-slate-200/80 dark:border-slate-800'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -63,10 +63,10 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
           target="_blank"
           rel="noopener noreferrer"
           title={`Open ${domain}`}
-          className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden shadow-inner group-hover:scale-105 transition"
+          className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden shadow-inner group-hover:scale-105 transition"
         >
           {imgError ? (
-            <Globe className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+            <Globe className="w-5 h-5 text-sky-500 dark:text-sky-400" />
           ) : (
             <img
               src={getFaviconUrl(bookmark.url)}
@@ -86,7 +86,7 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
               href={bookmark.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-bold text-sm text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition truncate max-w-[calc(100%-2rem)] flex items-center gap-1"
+              className="font-bold text-sm text-slate-900 dark:text-white hover:text-sky-600 dark:hover:text-sky-400 transition truncate max-w-[calc(100%-2rem)] flex items-center gap-1"
             >
               <span>{bookmark.title}</span>
               <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-60 transition shrink-0" />
@@ -134,7 +134,7 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
                   key={tag}
                   type="button"
                   onClick={() => onSelectTag(tag)}
-                  className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+                  className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-600 dark:hover:text-sky-400 transition"
                 >
                   #{tag}
                 </button>

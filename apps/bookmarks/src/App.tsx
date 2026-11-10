@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useMeshKernel, useCollection } from '@localfirst/mesh-sync';
 import type { Bookmark, SpaceMeta } from './domain/schema.ts';
 import { Header } from './components/Header.tsx';
+import { BookmarkHeroCard } from './components/BookmarkHeroCard.tsx';
 import { BookmarkItem } from './components/BookmarkItem.tsx';
 import { AddBookmarkModal } from './components/AddBookmarkModal.tsx';
 import { TagFilter } from './components/TagFilter.tsx';
@@ -244,7 +245,7 @@ export const App: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex items-center justify-center p-4">
         <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-3xl p-6 max-w-sm text-center shadow-lg">
           <ShieldAlert className="w-10 h-10 text-rose-500 mx-auto mb-3" />
           <h2 className="text-base font-bold text-rose-800 dark:text-rose-200">Mesh Engine Error</h2>
@@ -256,7 +257,7 @@ export const App: React.FC = () => {
 
   if (!isReady || !status) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
         <Loader2 className="w-8 h-8 text-sky-500 animate-spin mb-3" />
         <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">Initializing Mesh Space...</h2>
         <p className="text-xs text-slate-400 mt-1 font-mono">Deriving AES-GCM Key & CRDT Storage</p>
@@ -265,27 +266,37 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200">
-      {/* Mobile-First Centered Container */}
-      <div className="w-full max-w-xl mx-auto flex-1 flex flex-col">
-        {/* Modern Top Header */}
-        <Header
-          kernel={kernel}
-          status={status}
-          spaceMeta={spaceMeta}
-          currentUserName={currentUserName}
-          isDark={isDark}
-          onToggleTheme={toggleTheme}
-          onOpenMeshModal={() => setIsMeshModalOpen(true)}
-          onOpenSwitchUser={() => setIsOnboardingOpen(true)}
-          onAddBookmark={() => {
-            setEditingBookmark(null);
-            setIsAddModalOpen(true);
-          }}
-        />
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex justify-center transition-colors duration-200">
+      {/* Mobile-Friendly Native Container (max-w-md on desktop, 100% on mobile) */}
+      <div className="w-full max-w-md bg-slate-50 dark:bg-slate-950 min-h-screen flex flex-col relative shadow-2xl pb-20 border-x border-slate-200/60 dark:border-slate-800/60">
+        {/* Floating Minimal Sync Toast */}
+        <SyncToast status={status} />
 
-        {/* Content Body */}
-        <main className="px-4 pt-2 pb-24 flex-1">
+        {/* STICKY TOP CONTAINER: Greeting Header + Hero Card */}
+        <div className="sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md pb-1.5 border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm transition-colors duration-200">
+          <Header
+            kernel={kernel}
+            status={status}
+            spaceMeta={spaceMeta}
+            currentUserName={currentUserName}
+            isDark={isDark}
+            onToggleTheme={toggleTheme}
+            onOpenMeshModal={() => setIsMeshModalOpen(true)}
+            onOpenSwitchUser={() => setIsOnboardingOpen(true)}
+          />
+
+          <BookmarkHeroCard
+            bookmarks={bookmarks}
+            spaceMeta={spaceMeta}
+            onOpenAddBookmark={() => {
+              setEditingBookmark(null);
+              setIsAddModalOpen(true);
+            }}
+          />
+        </div>
+
+        {/* SCROLLABLE MAIN CONTENT */}
+        <main className="px-4 pt-3 pb-24 flex-1">
           {/* Tag Filter & Search */}
           <TagFilter
             tags={allTags}
@@ -304,16 +315,16 @@ export const App: React.FC = () => {
 
           {/* Bookmarks List */}
           {filteredBookmarks.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 text-center shadow-sm space-y-3 mt-2">
-              <div className="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/60 text-sky-500 mx-auto flex items-center justify-center">
-                <BookmarkIcon className="w-6 h-6" />
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 rounded-3xl p-8 text-center shadow-sm space-y-3 mt-3">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-sky-500/10 to-indigo-500/10 text-sky-600 dark:text-sky-400 mx-auto flex items-center justify-center shadow-inner">
+                <BookmarkIcon className="w-7 h-7" />
               </div>
               <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-200">
                 {bookmarks.length === 0 ? 'No bookmarks saved yet' : 'No links match your filter'}
               </h3>
               <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
                 {bookmarks.length === 0
-                  ? 'Tap the button below or in the top bar to save your first link to this encrypted P2P space.'
+                  ? 'Tap the button below to save your first link to this encrypted P2P space.'
                   : 'Try clearing your search or tag filters to see more links.'}
               </p>
               {bookmarks.length === 0 && (
@@ -322,7 +333,7 @@ export const App: React.FC = () => {
                     setEditingBookmark(null);
                     setIsAddModalOpen(true);
                   }}
-                  className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-md transition active:scale-95 inline-flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-md shadow-sky-500/20 transition active:scale-95 inline-flex items-center gap-1.5"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add First Bookmark</span>
@@ -355,7 +366,7 @@ export const App: React.FC = () => {
             setEditingBookmark(null);
             setIsAddModalOpen(true);
           }}
-          className="w-13 h-13 sm:w-14 sm:h-14 p-3.5 rounded-full bg-sky-500 hover:bg-sky-600 text-white shadow-xl flex items-center justify-center transition active:scale-90 hover:scale-105"
+          className="w-13 h-13 sm:w-14 sm:h-14 p-3.5 rounded-full bg-sky-500 hover:bg-sky-600 text-white shadow-xl shadow-sky-500/25 flex items-center justify-center transition active:scale-90 hover:scale-105"
           title="Add New Link"
         >
           <Plus className="w-6 h-6" />
@@ -386,7 +397,7 @@ export const App: React.FC = () => {
         peersCount={status?.peersCount || 0}
       />
 
-      {/* Decentralized P2P Mesh Network Modal (Telemetry, IPFS, Backups) */}
+      {/* Decentralized P2P Mesh Network Modal */}
       <MeshInspectorModal
         isOpen={isMeshModalOpen}
         onClose={() => setIsMeshModalOpen(false)}
@@ -398,9 +409,6 @@ export const App: React.FC = () => {
         onExportSnapshot={handleExportSnapshot}
         onImportJson={handleImportJson}
       />
-
-      {/* Reactive Mesh & Sync Notification Toast */}
-      <SyncToast status={status} />
     </div>
   );
 };
