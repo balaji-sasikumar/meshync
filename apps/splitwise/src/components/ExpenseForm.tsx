@@ -20,7 +20,8 @@ import {
 interface ExpenseFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (expense: Omit<Expense, 'id'>) => void;
+  onSubmit: (expense: Omit<Expense, 'id'>, editId?: string) => void;
+  editingExpense?: Expense | null;
   groupMeta: GroupMeta | null;
   currentUserName: string;
 }
@@ -29,11 +30,12 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  editingExpense = null,
   groupMeta,
   currentUserName
 }) => {
   const members = groupMeta?.members && groupMeta.members.length > 0
-    ? groupMeta.members
+    ? groupMeta.members.filter(m => m.toLowerCase() !== 'you')
     : [currentUserName || 'Member 1'];
 
   const groupCurrency = (groupMeta?.currency as SupportedCurrency) || 'INR';
@@ -46,19 +48,33 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
   const [category, setCategory] = useState<string>('Food & Dining');
   const [note, setNote] = useState('');
 
-  // Keep currency and members in sync with groupMeta whenever form opens
+  // Pre-fill fields if editing an existing expense or reset for new expense
   useEffect(() => {
     if (isOpen) {
-      const activeCurrency = (groupMeta?.currency as SupportedCurrency) || 'INR';
-      setCurrency(activeCurrency);
-      setParticipants(members);
-      if (currentUserName && members.includes(currentUserName)) {
-        setPayer(currentUserName);
-      } else if (members.length > 0) {
-        setPayer(members[0]);
+      if (editingExpense) {
+        setDescription(editingExpense.description);
+        setAmount(editingExpense.amount.toString());
+        setCurrency((editingExpense.currency as SupportedCurrency) || groupCurrency);
+        setPayer(editingExpense.payer);
+        setParticipants(editingExpense.participants);
+        setCategory(editingExpense.category || 'Food & Dining');
+        setNote(editingExpense.note || '');
+      } else {
+        const activeCurrency = (groupMeta?.currency as SupportedCurrency) || 'INR';
+        setDescription('');
+        setAmount('');
+        setCurrency(activeCurrency);
+        setParticipants(members);
+        setCategory('Food & Dining');
+        setNote('');
+        if (currentUserName && members.includes(currentUserName)) {
+          setPayer(currentUserName);
+        } else if (members.length > 0) {
+          setPayer(members[0]);
+        }
       }
     }
-  }, [isOpen, groupMeta?.currency, groupMeta?.members, currentUserName]);
+  }, [isOpen, editingExpense, groupMeta?.currency, groupMeta?.members, currentUserName]);
 
   if (!isOpen) return null;
 
@@ -87,21 +103,20 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
     if (isNaN(parsedAmount) || parsedAmount <= 0) return;
     if (!description.trim() || participants.length === 0) return;
 
-    onSubmit({
-      description: description.trim(),
-      amount: parsedAmount,
-      currency,
-      payer,
-      participants,
-      category,
-      note: note.trim() || undefined,
-      timestamp: Date.now()
-    });
+    onSubmit(
+      {
+        description: description.trim(),
+        amount: parsedAmount,
+        currency,
+        payer,
+        participants,
+        category,
+        note: note.trim() || undefined,
+        timestamp: editingExpense ? editingExpense.timestamp : Date.now()
+      },
+      editingExpense ? editingExpense.id : undefined
+    );
 
-    // Reset and close
-    setDescription('');
-    setAmount('');
-    setNote('');
     onClose();
   };
 
@@ -114,8 +129,12 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
       <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 relative border border-slate-100 dark:border-slate-800 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">Add New Bill</h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">Split costs evenly with your group</p>
+            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">
+              {editingExpense ? 'Edit Bill' : 'Add New Bill'}
+            </h2>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              {editingExpense ? 'Update amount, payer or participants' : 'Split costs evenly with your group'}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -172,7 +191,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
             />
           </div>
 
-          {/* Amount & Currency (Defaults to group currency e.g. INR) */}
+          {/* Amount & Currency */}
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
@@ -213,7 +232,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
             </div>
           </div>
 
-          {/* Paid By (Clean member names without "You") */}
+          {/* Paid By */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
               Paid By
@@ -247,7 +266,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
             </div>
           </div>
 
-          {/* Split Between with Checkboxes (Clean names, no "(You)") */}
+          {/* Split Between with Checkboxes */}
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -327,7 +346,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
             className="w-full py-2.5 bg-sky-500 hover:bg-sky-600 active:scale-[0.98] text-white font-extrabold rounded-xl shadow-lg shadow-sky-500/25 transition flex items-center justify-center gap-2 disabled:opacity-50 mt-1"
           >
             <Check className="w-4 h-4" />
-            <span>Add Bill</span>
+            <span>{editingExpense ? 'Save Changes' : 'Add Bill'}</span>
           </button>
         </form>
       </div>

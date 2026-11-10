@@ -17,6 +17,7 @@ import { ShieldAlert, Loader2 } from 'lucide-react';
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'expenses' | 'settlements'>('expenses');
   const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isMeshModalOpen, setIsMeshModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [currentUserName, setCurrentUserName] = useState<string>('');
@@ -52,6 +53,7 @@ export const App: React.FC = () => {
   const {
     items: expenses,
     add: addExpense,
+    update: updateExpense,
     remove: removeExpense
   } = useCollection<Expense>(kernel, 'expenses');
 
@@ -207,11 +209,26 @@ export const App: React.FC = () => {
     setIsOnboardingOpen(false);
   };
 
-  const handleAddExpense = (newExpense: Omit<Expense, 'id'>) => {
-    addExpense({
-      ...newExpense,
-      id: `exp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
-    });
+  const handleAddOrUpdateExpense = (newExpense: Omit<Expense, 'id'>, editId?: string) => {
+    if (editId) {
+      updateExpense(editId, newExpense);
+    } else {
+      addExpense({
+        ...newExpense,
+        id: `exp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+      });
+    }
+    setEditingExpense(null);
+  };
+
+  const handleOpenEditExpense = (expense: Expense) => {
+    setEditingExpense(expense);
+    setIsExpenseFormOpen(true);
+  };
+
+  const handleOpenAddExpense = () => {
+    setEditingExpense(null);
+    setIsExpenseFormOpen(true);
   };
 
   // Dedicated settlement handler - saves directly to settlements collection
@@ -335,7 +352,7 @@ export const App: React.FC = () => {
             groupMeta={groupMeta}
             currentUserName={currentUserName}
             userNetBalance={userNetBalance}
-            onOpenAddExpense={() => setIsExpenseFormOpen(true)}
+            onOpenAddExpense={handleOpenAddExpense}
             onViewPayoffs={() => setActiveTab('settlements')}
           />
         </div>
@@ -346,7 +363,8 @@ export const App: React.FC = () => {
             <ExpenseList
               expenses={genuineExpenses}
               onDeleteExpense={removeExpense}
-              onOpenAddExpense={() => setIsExpenseFormOpen(true)}
+              onEditExpense={handleOpenEditExpense}
+              onOpenAddExpense={handleOpenAddExpense}
               currentUserName={currentUserName}
             />
           ) : (
@@ -366,7 +384,7 @@ export const App: React.FC = () => {
         <BottomNav
           activeTab={activeTab}
           onChangeTab={setActiveTab}
-          onOpenAddExpense={() => setIsExpenseFormOpen(true)}
+          onOpenAddExpense={handleOpenAddExpense}
           expenseCount={genuineExpenses.length}
         />
 
@@ -380,11 +398,15 @@ export const App: React.FC = () => {
           onClose={currentUserName && currentUserName.toLowerCase() !== 'you' ? () => setIsOnboardingOpen(false) : undefined}
         />
 
-        {/* Add Expense Form Modal */}
+        {/* Add / Edit Expense Form Modal */}
         <ExpenseForm
           isOpen={isExpenseFormOpen}
-          onClose={() => setIsExpenseFormOpen(false)}
-          onSubmit={handleAddExpense}
+          onClose={() => {
+            setIsExpenseFormOpen(false);
+            setEditingExpense(null);
+          }}
+          onSubmit={handleAddOrUpdateExpense}
+          editingExpense={editingExpense}
           groupMeta={groupMeta}
           currentUserName={currentUserName}
         />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Search, Receipt } from 'lucide-react';
+import { Trash2, Search, Receipt, Edit2, Filter } from 'lucide-react';
 import type { Expense } from '../domain/schema.ts';
 import { isSettlementItem } from '../domain/schema.ts';
 import {
@@ -12,6 +12,7 @@ import {
 interface ExpenseListProps {
   expenses: Expense[];
   onDeleteExpense: (id: string) => void;
+  onEditExpense: (expense: Expense) => void;
   onOpenAddExpense: () => void;
   currentUserName: string;
 }
@@ -19,14 +20,26 @@ interface ExpenseListProps {
 export const ExpenseList: React.FC<ExpenseListProps> = ({
   expenses,
   onDeleteExpense,
+  onEditExpense,
   onOpenAddExpense,
   currentUserName
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedMember, setSelectedMember] = useState<string>('ALL');
 
   // Strictly filter out any settlement records from the Bills list
   const genuineExpenses = expenses.filter(e => !isSettlementItem(e));
+
+  // Compute all unique members present in expenses
+  const allMembers = React.useMemo(() => {
+    const set = new Set<string>();
+    genuineExpenses.forEach(e => {
+      if (e.payer) set.add(e.payer);
+      e.participants.forEach(p => set.add(p));
+    });
+    return Array.from(set).sort();
+  }, [genuineExpenses]);
 
   const filteredExpenses = genuineExpenses
     .filter(exp => {
@@ -38,7 +51,12 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
       const matchesCategory =
         selectedCategory === 'ALL' || exp.category === selectedCategory;
 
-      return matchesSearch && matchesCategory;
+      const matchesMember =
+        selectedMember === 'ALL' ||
+        exp.payer.toLowerCase() === selectedMember.toLowerCase() ||
+        exp.participants.some(p => p.toLowerCase() === selectedMember.toLowerCase());
+
+      return matchesSearch && matchesCategory && matchesMember;
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
@@ -56,15 +74,46 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
 
       {/* Search Bar */}
       {genuineExpenses.length > 2 && (
-        <div className="relative mb-3">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search bills, members..."
-            className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-sm dark:text-white"
-          />
+        <div className="space-y-2 mb-3">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search bills, members..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-sm dark:text-white"
+            />
+          </div>
+
+          {/* Member Filter Chips */}
+          {allMembers.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <button
+                onClick={() => setSelectedMember('ALL')}
+                className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all shrink-0 ${
+                  selectedMember === 'ALL'
+                    ? 'bg-sky-500 text-white shadow-sm'
+                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                All Members
+              </button>
+              {allMembers.map(m => (
+                <button
+                  key={m}
+                  onClick={() => setSelectedMember(m)}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all shrink-0 ${
+                    selectedMember.toLowerCase() === m.toLowerCase()
+                      ? 'bg-sky-500 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -144,9 +193,9 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                   </div>
                 </div>
 
-                {/* Right: Personal Credit/Debit and Total */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="text-right">
+                {/* Right: Personal Credit/Debit and Actions */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="text-right mr-1">
                     {personalType === 'lent' && (
                       <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
                         +{symbol}{personalAmount.toFixed(2)}
@@ -172,6 +221,16 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                     </p>
                   </div>
 
+                  {/* Edit Button */}
+                  <button
+                    onClick={() => onEditExpense(expense)}
+                    title="Edit bill"
+                    className="p-1.5 rounded-lg text-slate-300 dark:text-slate-600 hover:text-sky-500 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 transition opacity-0 group-hover:opacity-100"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Delete Button */}
                   <button
                     onClick={() => {
                       if (confirm(`Delete "${expense.description}"?`)) {

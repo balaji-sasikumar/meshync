@@ -12,7 +12,8 @@ import {
   Copy,
   Check,
   RefreshCw,
-  Users
+  Users,
+  RotateCcw
 } from 'lucide-react';
 import type { MeshKernel, MeshKernelStatus } from '@localfirst/mesh-sync';
 import type { GroupMeta } from '../domain/schema.ts';
@@ -297,6 +298,39 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-medium text-[11px]"
           >
             Export .bin
+          </button>
+        </div>
+
+        {/* 1-Click Reset Everything */}
+        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <button
+            onClick={() => {
+              if (confirm('Clear all local data and start fresh? This will wipe all IndexedDB stores, remove your stored user profiles, and load a clean workspace.')) {
+                localStorage.clear();
+                sessionStorage.clear();
+                if (typeof window !== 'undefined') {
+                  if (window.indexedDB && window.indexedDB.databases) {
+                    window.indexedDB.databases().then(dbs => {
+                      dbs.forEach(db => {
+                        if (db.name) window.indexedDB.deleteDatabase(db.name);
+                      });
+                      window.location.hash = '';
+                      window.location.reload();
+                    }).catch(() => {
+                      window.location.hash = '';
+                      window.location.reload();
+                    });
+                  } else {
+                    window.location.hash = '';
+                    window.location.reload();
+                  }
+                }
+              }
+            }}
+            className="w-full py-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset Everything & Start Fresh</span>
           </button>
         </div>
       </div>
