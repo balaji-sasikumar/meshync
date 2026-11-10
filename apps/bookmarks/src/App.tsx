@@ -265,14 +265,14 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex justify-center transition-colors duration-200">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#090b0e] flex justify-center transition-colors duration-200">
       {/* Mobile-Friendly Native Container (max-w-md on desktop, 100% on mobile) */}
-      <div className="w-full max-w-md bg-slate-50 dark:bg-slate-950 min-h-screen flex flex-col relative shadow-2xl pb-20 border-x border-slate-200/60 dark:border-slate-800/60">
+      <div className="w-full max-w-md bg-white dark:bg-[#0e1015] min-h-screen flex flex-col relative shadow-2xl pb-20 border-x border-slate-200/80 dark:border-slate-800/80">
         {/* Floating Minimal Sync Toast */}
         <SyncToast status={status} />
 
         {/* STICKY TOP CONTAINER: Greeting Header */}
-        <div className="sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md pb-2 border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm transition-colors duration-200">
+        <div className="sticky top-0 z-30 bg-white/95 dark:bg-[#0e1015]/95 backdrop-blur-md pb-1.5 border-b border-slate-200/80 dark:border-slate-800/80 shadow-sm transition-colors duration-200">
           <Header
             kernel={kernel}
             status={status}
@@ -286,7 +286,7 @@ export const App: React.FC = () => {
         </div>
 
         {/* SCROLLABLE MAIN CONTENT */}
-        <main className="px-4 pt-3 pb-24 flex-1">
+        <main className="px-4 pt-2 pb-24 flex-1">
           {/* Tag Filter & Search */}
           <TagFilter
             tags={allTags}
@@ -305,9 +305,9 @@ export const App: React.FC = () => {
 
           {/* Bookmarks List */}
           {filteredBookmarks.length === 0 ? (
-            <div className="bg-white/80 dark:bg-slate-900/80 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm space-y-2.5 mt-2">
-              <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-500 mx-auto flex items-center justify-center">
-                <BookmarkIcon className="w-5 h-5" />
+            <div className="bg-slate-50/80 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm space-y-2 mt-4">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 mx-auto flex items-center justify-center">
+                <BookmarkIcon className="w-5 h-5 fill-current" />
               </div>
               <h3 className="font-extrabold text-xs text-slate-800 dark:text-slate-200">
                 {bookmarks.length === 0 ? 'No bookmarks saved yet' : 'No links match your filter'}
@@ -323,7 +323,7 @@ export const App: React.FC = () => {
                     setEditingBookmark(null);
                     setIsAddModalOpen(true);
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-sm transition active:scale-95 inline-flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-sm transition active:scale-95 inline-flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add First Bookmark</span>
@@ -331,7 +331,7 @@ export const App: React.FC = () => {
               )}
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
               {filteredBookmarks.map(bm => (
                 <BookmarkItem
                   key={bm.id}
@@ -356,7 +356,7 @@ export const App: React.FC = () => {
             setEditingBookmark(null);
             setIsAddModalOpen(true);
           }}
-          className="w-13 h-13 sm:w-14 sm:h-14 p-3.5 rounded-full bg-sky-500 hover:bg-sky-600 text-white shadow-xl shadow-sky-500/25 flex items-center justify-center transition active:scale-90 hover:scale-105"
+          className="w-13 h-13 sm:w-14 sm:h-14 p-3.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-xl shadow-orange-500/25 flex items-center justify-center transition active:scale-90 hover:scale-105"
           title="Add New Link"
         >
           <Plus className="w-6 h-6" />

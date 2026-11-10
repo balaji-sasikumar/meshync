@@ -59,6 +59,21 @@ export function formatTimeAgo(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+export function formatFeedDate(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  if (diff < 86400000) {
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'JUST NOW';
+    if (mins < 60) return `${mins}M AGO`;
+    const hours = Math.floor(mins / 60);
+    return `${hours}H AGO`;
+  }
+  const date = new Date(timestamp);
+  const month = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  const day = date.getDate();
+  return `${month} ${day}`;
+}
+
 const AVATAR_COLORS = [
   { bg: 'bg-indigo-500', text: 'text-white' },
   { bg: 'bg-emerald-500', text: 'text-white' },
