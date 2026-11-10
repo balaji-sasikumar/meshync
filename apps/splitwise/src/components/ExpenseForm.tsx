@@ -241,11 +241,16 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
-          {/* Category: 4x2 Grid without horizontal scrolling */}
+          {/* Category: Compact Small Cards */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-              Category
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Category
+              </label>
+              <span className="text-[11px] font-extrabold text-sky-600 dark:text-sky-400">
+                {CATEGORY_INFO[category]?.emoji} {category}
+              </span>
+            </div>
             <div className="grid grid-cols-4 gap-1.5">
               {EXPENSE_CATEGORIES.map(cat => {
                 const info = CATEGORY_INFO[cat];
@@ -255,14 +260,14 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
                     key={cat}
                     type="button"
                     onClick={() => setCategory(cat)}
-                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-center transition-all border ${
+                    className={`flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg text-center transition-all border ${
                       isSelected
-                        ? 'bg-sky-500 border-sky-500 text-white shadow-sm ring-2 ring-sky-300 dark:ring-sky-700'
+                        ? 'bg-sky-500 border-sky-500 text-white shadow-sm ring-1 ring-sky-300 dark:ring-sky-600 font-bold scale-[1.02]'
                         : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <span className="text-lg leading-none mb-1">{info.emoji}</span>
-                    <span className="text-[10px] font-bold truncate max-w-full leading-tight">
+                    <span className="text-sm leading-none shrink-0">{info.emoji}</span>
+                    <span className="text-[10px] font-bold truncate leading-tight">
                       {cat.split(' ')[0]}
                     </span>
                   </button>
