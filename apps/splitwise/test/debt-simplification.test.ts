@@ -109,4 +109,44 @@ describe('Debt Simplification & Cash-Flow Minimization', () => {
     assert.equal(settlements[0].to, 'Alice');
     assert.equal(settlements[0].amount, 150);
   });
+
+  test('settlement payment offsets debt without altering expenses', () => {
+    const expenses: Expense[] = [
+      {
+        id: 'e1',
+        description: 'Dinner',
+        amount: 100,
+        currency: 'INR',
+        payer: 'Balaji',
+        participants: ['Balaji', 'Bob'],
+        timestamp: 1,
+        category: 'Food & Dining'
+      }
+    ];
+
+    // Initially Bob owes Balaji 50 INR
+    const initial = computeAllSettlements(expenses);
+    assert.equal(initial.settlementsByCurrency.get('INR')![0].amount, 50);
+
+    // Bob settles 50 INR to Balaji
+    const settlements = [
+      {
+        id: 's1',
+        from: 'Bob',
+        to: 'Balaji',
+        amount: 50,
+        currency: 'INR',
+        timestamp: 2
+      }
+    ];
+
+    const afterSettlement = computeAllSettlements(expenses, settlements);
+    const inrSettlements = afterSettlement.settlementsByCurrency.get('INR') || [];
+    // All debts should be cleared!
+    assert.equal(inrSettlements.length, 0);
+
+    const balances = afterSettlement.balancesByCurrency.get('INR')!;
+    assert.equal(balances.find(b => b.person === 'Balaji')!.balance, 0);
+    assert.equal(balances.find(b => b.person === 'Bob')!.balance, 0);
+  });
 });

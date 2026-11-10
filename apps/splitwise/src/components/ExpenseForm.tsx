@@ -2,11 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   X,
   Check,
-  DollarSign,
-  Calendar,
-  Users,
-  CheckSquare,
-  Square
+  Users
 } from 'lucide-react';
 import {
   EXPENSE_CATEGORIES,
@@ -38,27 +34,31 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
 }) => {
   const members = groupMeta?.members && groupMeta.members.length > 0
     ? groupMeta.members
-    : [currentUserName || 'You'];
+    : [currentUserName || 'Member 1'];
 
-  const defaultCurrency = (groupMeta?.currency as SupportedCurrency) || 'USD';
+  const groupCurrency = (groupMeta?.currency as SupportedCurrency) || 'INR';
 
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<SupportedCurrency>(defaultCurrency);
-  const [payer, setPayer] = useState(currentUserName || members[0] || 'You');
+  const [currency, setCurrency] = useState<SupportedCurrency>(groupCurrency);
+  const [payer, setPayer] = useState(currentUserName || members[0]);
   const [participants, setParticipants] = useState<string[]>(members);
   const [category, setCategory] = useState<string>('Food & Dining');
   const [note, setNote] = useState('');
 
-  // Keep members in sync if group changes
+  // Keep currency and members in sync with groupMeta whenever form opens
   useEffect(() => {
-    if (members.length > 0) {
+    if (isOpen) {
+      const activeCurrency = (groupMeta?.currency as SupportedCurrency) || 'INR';
+      setCurrency(activeCurrency);
       setParticipants(members);
-      if (!payer || !members.includes(payer)) {
-        setPayer(currentUserName || members[0]);
+      if (currentUserName && members.includes(currentUserName)) {
+        setPayer(currentUserName);
+      } else if (members.length > 0) {
+        setPayer(members[0]);
       }
     }
-  }, [groupMeta?.members, currentUserName]);
+  }, [isOpen, groupMeta?.currency, groupMeta?.members, currentUserName]);
 
   if (!isOpen) return null;
 
@@ -77,7 +77,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
   };
 
   const handleDeselectAll = () => {
-    // Keep at least payer or current user
+    // Keep at least payer
     setParticipants([payer]);
   };
 
@@ -111,27 +111,27 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white text-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 relative border border-slate-100 max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 relative border border-slate-100 dark:border-slate-800 max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h2 className="text-lg font-extrabold text-slate-900">Add New Bill</h2>
-            <p className="text-[11px] text-slate-500">Split costs evenly with your group</p>
+            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">Add New Bill</h2>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">Split costs evenly with your group</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Category Chips */}
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          {/* Category: 4x2 Grid without horizontal scrolling */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+            <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
               Category
             </label>
-            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            <div className="grid grid-cols-4 gap-1.5">
               {EXPENSE_CATEGORIES.map(cat => {
                 const info = CATEGORY_INFO[cat];
                 const isSelected = category === cat;
@@ -140,14 +140,16 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
                     key={cat}
                     type="button"
                     onClick={() => setCategory(cat)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-center transition-all border ${
                       isSelected
-                        ? 'bg-sky-500 border-sky-500 text-white shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        ? 'bg-sky-500 border-sky-500 text-white shadow-sm ring-2 ring-sky-300 dark:ring-sky-700'
+                        : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <span>{info.emoji}</span>
-                    <span>{cat}</span>
+                    <span className="text-lg leading-none mb-1">{info.emoji}</span>
+                    <span className="text-[10px] font-bold truncate max-w-full leading-tight">
+                      {cat.split(' ')[0]}
+                    </span>
                   </button>
                 );
               })}
@@ -156,7 +158,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
           {/* Title / Description */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
               Bill Title
             </label>
             <input
@@ -165,19 +167,19 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
               autoFocus
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="e.g. Cheese Burger, Taxi, Groceries..."
-              className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
+              placeholder="e.g. Dinner, Groceries, Uber..."
+              className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all dark:text-white"
             />
           </div>
 
-          {/* Amount & Currency */}
+          {/* Amount & Currency (Defaults to group currency e.g. INR) */}
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                 Total Amount
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400 font-bold text-sm">
                   {getCurrencySymbol(currency)}
                 </span>
                 <input
@@ -188,19 +190,19 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-8 pr-4 py-2.5 text-base font-extrabold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
+                  className="w-full pl-8 pr-3 py-2 text-base font-extrabold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all dark:text-white"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                 Currency
               </label>
               <select
                 value={currency}
                 onChange={e => setCurrency(e.target.value as SupportedCurrency)}
-                className="w-full px-3 py-2.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all h-[42px]"
+                className="w-full px-2.5 py-2 text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all h-[38px] dark:text-white"
               >
                 {SUPPORTED_CURRENCIES.map(curr => (
                   <option key={curr} value={curr}>
@@ -211,12 +213,12 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
             </div>
           </div>
 
-          {/* Paid By */}
+          {/* Paid By (Clean member names without "You") */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
               Paid By
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
               {members.map(member => {
                 const isSelected = payer === member;
                 const color = getAvatarColor(member);
@@ -227,16 +229,16 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
                     onClick={() => setPayer(member)}
                     className={`flex items-center gap-2 p-2 rounded-xl border text-left transition-all ${
                       isSelected
-                        ? 'bg-sky-50 border-sky-500 ring-1 ring-sky-500 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                        ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-500 ring-1 ring-sky-500 shadow-sm'
+                        : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
                     <div
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${color.bg} ${color.text}`}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${color.bg} ${color.text}`}
                     >
                       {member.substring(0, 2).toUpperCase()}
                     </div>
-                    <span className="text-xs font-bold text-slate-800 truncate">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
                       {member}
                     </span>
                   </button>
@@ -245,25 +247,25 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
             </div>
           </div>
 
-          {/* Split Between with Checkboxes (Requested by User) */}
-          <div className="pt-2 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+          {/* Split Between with Checkboxes (Clean names, no "(You)") */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Split Between ({participants.length} selected)
               </label>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={handleSelectAll}
-                  className="text-[11px] font-bold text-sky-600 hover:text-sky-700"
+                  className="text-[11px] font-bold text-sky-600 dark:text-sky-400 hover:underline"
                 >
                   Select All
                 </button>
-                <span className="text-slate-300">•</span>
+                <span className="text-slate-300 dark:text-slate-600">•</span>
                 <button
                   type="button"
                   onClick={handleDeselectAll}
-                  className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
+                  className="text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:underline"
                 >
                   Clear
                 </button>
@@ -271,7 +273,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
             </div>
 
             {/* Checkbox List of Members */}
-            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
               {members.map(person => {
                 const isChecked = participants.includes(person);
                 const color = getAvatarColor(person);
@@ -280,31 +282,29 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
                     key={person}
                     className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer select-none transition-all ${
                       isChecked
-                        ? 'bg-sky-50/70 border-sky-300'
-                        : 'bg-slate-50 border-slate-200 opacity-60 hover:opacity-90'
+                        ? 'bg-sky-50/70 dark:bg-sky-950/30 border-sky-300 dark:border-sky-800'
+                        : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/50 opacity-60 hover:opacity-90'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="relative">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleParticipant(person)}
-                          className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer"
-                        />
-                      </div>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleToggleParticipant(person)}
+                        className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 dark:border-slate-600 cursor-pointer"
+                      />
                       <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${color.bg} ${color.text}`}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${color.bg} ${color.text}`}
                       >
                         {person.substring(0, 2).toUpperCase()}
                       </div>
-                      <span className="text-xs font-bold text-slate-800">
-                        {person} {person === currentUserName && '(You)'}
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {person}
                       </span>
                     </div>
 
                     {isChecked && parseFloat(amount) > 0 && (
-                      <span className="text-xs font-bold text-sky-600">
+                      <span className="text-xs font-bold text-sky-600 dark:text-sky-400 font-mono">
                         {getCurrencySymbol(currency)}{splitAmount}
                       </span>
                     )}
@@ -315,8 +315,8 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
             {/* Split Summary Footer */}
             {parseFloat(amount) > 0 && participants.length > 0 && (
-              <div className="mt-2.5 p-2 bg-slate-100 rounded-xl text-center text-xs font-semibold text-slate-600">
-                Split equally: <span className="font-extrabold text-slate-900">{getCurrencySymbol(currency)}{splitAmount}</span> / person ({participants.length} people)
+              <div className="mt-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-center text-xs font-semibold text-slate-600 dark:text-slate-300">
+                Split equally: <span className="font-extrabold text-slate-900 dark:text-white">{getCurrencySymbol(currency)}{splitAmount}</span> / person ({participants.length} people)
               </div>
             )}
           </div>
@@ -324,7 +324,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
           <button
             type="submit"
             disabled={!description.trim() || !amount || participants.length === 0}
-            className="w-full py-3 bg-sky-500 hover:bg-sky-600 active:scale-[0.98] text-white font-extrabold rounded-2xl shadow-lg shadow-sky-500/25 transition flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+            className="w-full py-2.5 bg-sky-500 hover:bg-sky-600 active:scale-[0.98] text-white font-extrabold rounded-xl shadow-lg shadow-sky-500/25 transition flex items-center justify-center gap-2 disabled:opacity-50 mt-1"
           >
             <Check className="w-4 h-4" />
             <span>Add Bill</span>

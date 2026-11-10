@@ -6,6 +6,16 @@ export interface GroupMeta {
   createdAt: number;
 }
 
+export interface SettlementRecord {
+  id: string;
+  from: string;
+  to: string;
+  amount: number;
+  currency: string;
+  timestamp: number;
+  note?: string;
+}
+
 export interface Expense {
   id: string;
   description: string;

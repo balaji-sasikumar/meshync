@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Plus, Sparkles, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Plus, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
 import type { Expense, GroupMeta } from '../domain/schema.ts';
 import { getCurrencySymbol } from '../domain/ui-helpers.ts';
 
@@ -20,7 +20,7 @@ export const HeroSummaryCard: React.FC<HeroSummaryCardProps> = ({
   onOpenAddExpense,
   onViewPayoffs
 }) => {
-  const currency = groupMeta?.currency || (expenses[0]?.currency) || 'USD';
+  const currency = groupMeta?.currency || (expenses[0]?.currency) || 'INR';
   const symbol = getCurrencySymbol(currency);
 
   const totalGroupSpend = expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
@@ -31,65 +31,67 @@ export const HeroSummaryCard: React.FC<HeroSummaryCardProps> = ({
   const isDebtor = userNetBalance < -0.01;
   const isSettled = !isCreditor && !isDebtor;
 
+  // Dynamic gradient based on user's personal financial position (income vs outgoing)
+  const cardGradient = isCreditor
+    ? 'from-emerald-500 via-teal-500 to-cyan-600 shadow-emerald-500/20'
+    : isDebtor
+    ? 'from-rose-500 via-orange-500 to-amber-600 shadow-rose-500/20'
+    : 'from-sky-500 via-blue-500 to-indigo-600 shadow-sky-500/20';
+
   return (
-    <div className="px-5 py-2">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-sky-400 to-sky-500 text-white shadow-xl shadow-sky-500/20 p-6 flex flex-col items-center text-center">
-        {/* Decorative soft backdrop circles */}
-        <div className="absolute -top-12 -left-12 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
-        <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-sky-300/30 rounded-full blur-xl pointer-events-none" />
+    <div className="px-4 py-1">
+      <div
+        className={`relative overflow-hidden rounded-2xl bg-gradient-to-r ${cardGradient} text-white shadow-lg p-4 transition-all duration-300`}
+      >
+        {/* Subtle decorative circles */}
+        <div className="absolute -top-8 -right-8 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />
 
-        {/* Playful bill/food icon badge */}
-        <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md shadow-inner flex items-center justify-center text-3xl mb-3 border border-white/25">
-          🍔
-        </div>
-
-        <p className="text-xs font-bold text-sky-100 uppercase tracking-widest">
-          Total Group Spend
-        </p>
-
-        <h2 className="text-3xl font-black tracking-tight mt-1 mb-1">
-          {symbol}{totalGroupSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </h2>
-
-        <p className="text-xs font-medium text-sky-100/90 mb-4">
-          {expenses.length} {expenses.length === 1 ? 'bill' : 'bills'} • {memberCount} {memberCount === 1 ? 'person' : 'people'}
-        </p>
-
-        {/* Personalized Net Balance Pill */}
-        <div className="w-full bg-white/20 backdrop-blur-md border border-white/25 rounded-2xl p-2.5 flex items-center justify-between text-xs mb-4">
-          <div className="flex items-center gap-2 pl-1">
-            {isCreditor && <TrendingUp className="w-4 h-4 text-emerald-200" />}
-            {isDebtor && <TrendingDown className="w-4 h-4 text-rose-200" />}
-            {isSettled && <CheckCircle2 className="w-4 h-4 text-white" />}
-            <span className="font-semibold text-white/95">
-              {isCreditor && 'You are owed'}
-              {isDebtor && 'You owe'}
-              {isSettled && 'Your balance'}
-            </span>
+        <div className="flex items-center justify-between gap-3">
+          {/* Left Column: Total Group Spend */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold text-white/80 uppercase tracking-widest leading-none mb-1">
+              Total Group Spend
+            </p>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-tight truncate">
+              {symbol}{totalGroupSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </h2>
+            <p className="text-[11px] text-white/85 font-medium mt-0.5">
+              {expenses.length} {expenses.length === 1 ? 'bill' : 'bills'} • {memberCount} {memberCount === 1 ? 'member' : 'members'}
+            </p>
           </div>
-          <span className="font-extrabold text-sm pr-1">
-            {isCreditor && `+${symbol}${userNetBalance.toFixed(2)}`}
-            {isDebtor && `-${symbol}${Math.abs(userNetBalance).toFixed(2)}`}
-            {isSettled && `${symbol}0.00`}
-          </span>
+
+          {/* Right Column: User's Personalized Income/Outgoing Balance */}
+          <div className="bg-white/20 backdrop-blur-md border border-white/25 rounded-xl px-3 py-2 text-right shrink-0">
+            <div className="flex items-center justify-end gap-1 text-[10px] font-bold text-white/90 uppercase tracking-wider mb-0.5">
+              {isCreditor && <TrendingUp className="w-3 h-3 text-emerald-200" />}
+              {isDebtor && <TrendingDown className="w-3 h-3 text-amber-200" />}
+              {isSettled && <CheckCircle2 className="w-3 h-3 text-white" />}
+              <span>{isCreditor ? 'You get back' : isDebtor ? 'You owe' : 'Your balance'}</span>
+            </div>
+            <p className="text-base font-black tracking-tight">
+              {isCreditor && `+${symbol}${userNetBalance.toFixed(2)}`}
+              {isDebtor && `-${symbol}${Math.abs(userNetBalance).toFixed(2)}`}
+              {isSettled && `${symbol}0.00`}
+            </p>
+          </div>
         </div>
 
-        {/* Action Row */}
-        <div className="w-full flex items-center gap-2.5">
+        {/* Action Buttons Row */}
+        <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-white/20">
           <button
             onClick={onOpenAddExpense}
-            className="flex-1 py-3 px-4 bg-white hover:bg-sky-50 active:scale-[0.98] text-sky-600 font-extrabold rounded-2xl shadow-md transition flex items-center justify-center gap-1.5 text-xs"
+            className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-100 active:scale-[0.98] text-slate-900 font-extrabold rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 text-xs"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5 text-sky-600" />
             <span>Add Bill</span>
           </button>
 
           <button
             onClick={onViewPayoffs}
-            className="py-3 px-4 bg-sky-600/50 hover:bg-sky-600/70 border border-white/30 text-white font-bold rounded-2xl transition flex items-center justify-center gap-1.5 text-xs active:scale-[0.98]"
+            className="py-1.5 px-3 bg-black/20 hover:bg-black/30 border border-white/20 text-white font-bold rounded-xl transition flex items-center justify-center gap-1 text-xs active:scale-[0.98]"
           >
-            <span>Payoffs</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <span>Balances</span>
+            <ArrowRight className="w-3 h-3" />
           </button>
         </div>
       </div>

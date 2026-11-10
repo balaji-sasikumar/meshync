@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useMeshKernel, useCollection } from '@localfirst/mesh-sync';
-import type { Expense, SettlementTransaction, GroupMeta } from './domain/schema.ts';
+import type { Expense, SettlementTransaction, SettlementRecord, GroupMeta } from './domain/schema.ts';
 import { computeAllSettlements } from './domain/debt-simplification.ts';
 import { Header } from './components/Header.tsx';
 import { HeroSummaryCard } from './components/HeroSummaryCard.tsx';
@@ -19,6 +19,25 @@ export const App: React.FC = () => {
   const [isMeshModalOpen, setIsMeshModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [currentUserName, setCurrentUserName] = useState<string>('');
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('peersplit_theme') === 'dark';
+    }
+    return false;
+  });
+
+  // Sync dark mode class to html element
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('peersplit_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('peersplit_theme', 'light');
+    }
+  }, [isDark]);
+
+  const toggleTheme = () => setIsDark(prev => !prev);
 
   // 1. Initialize decoupled Headless Sync Kernel
   const { kernel, status, isReady, error } = useMeshKernel();
@@ -35,6 +54,13 @@ export const App: React.FC = () => {
     remove: removeExpense
   } = useCollection<Expense>(kernel, 'expenses');
 
+  // Dedicated settlements collection (does not inflate group expenditure)
+  const {
+    items: settlementRecords,
+    add: addSettlementRecord,
+    remove: removeSettlementRecord
+  } = useCollection<SettlementRecord>(kernel, 'settlements');
+
   const groupMeta: GroupMeta | null = groupMetaList[0] || null;
 
   // 3. User Identity resolution from localStorage
@@ -44,22 +70,22 @@ export const App: React.FC = () => {
     if (!isReady || !workspaceId) return;
 
     const storageKey = `peersplit_user_${workspaceId}`;
-    const savedUser = localStorage.getItem(storageKey);
+    const savedWorkspaceUser = localStorage.getItem(storageKey);
+    const savedLastUser = localStorage.getItem('peersplit_last_user');
 
-    if (savedUser) {
-      setCurrentUserName(savedUser);
+    if (savedWorkspaceUser) {
+      setCurrentUserName(savedWorkspaceUser);
+      setIsOnboardingOpen(false);
+    } else if (savedLastUser && groupMeta?.members?.some(m => m.toLowerCase() === savedLastUser.toLowerCase())) {
+      // Auto-assign previous user name if they are in this group's member list
+      setCurrentUserName(savedLastUser);
+      localStorage.setItem(storageKey, savedLastUser);
+      setIsOnboardingOpen(false);
     } else {
-      // First time opening link: show "Who are you?" or "Create Group"
+      // First time opening: show onboarding only if user not yet resolved
       setIsOnboardingOpen(true);
     }
-  }, [isReady, workspaceId]);
-
-  // If group exists but user not set, make sure modal is open
-  useEffect(() => {
-    if (isReady && !currentUserName) {
-      setIsOnboardingOpen(true);
-    }
-  }, [isReady, currentUserName]);
+  }, [isReady, workspaceId, groupMeta?.members]);
 
   // 4. Compute all unique participants
   const knownParticipants = useMemo(() => {
@@ -74,15 +100,15 @@ export const App: React.FC = () => {
     return Array.from(set).sort();
   }, [groupMeta, expenses]);
 
-  // 5. Compute pure client-side deterministic debt settlements
+  // 5. Compute pure client-side deterministic debt settlements (with offset payments)
   const { balancesByCurrency, settlementsByCurrency } = useMemo(() => {
-    return computeAllSettlements(expenses);
-  }, [expenses]);
+    return computeAllSettlements(expenses, settlementRecords);
+  }, [expenses, settlementRecords]);
 
   // Compute current user's net balance across the group's active currency
   const userNetBalance = useMemo(() => {
     if (!currentUserName) return 0;
-    const groupCurrency = groupMeta?.currency || (expenses[0]?.currency) || 'USD';
+    const groupCurrency = groupMeta?.currency || (expenses[0]?.currency) || 'INR';
     const balances = balancesByCurrency.get(groupCurrency) || [];
     const userBalanceObj = balances.find(b => b.person.toLowerCase() === currentUserName.toLowerCase());
     return userBalanceObj ? userBalanceObj.balance : 0;
@@ -94,9 +120,8 @@ export const App: React.FC = () => {
       ...newGroup,
       id: 'current_group'
     });
-    // If user has not chosen name yet, keep onboarding open for "Who are you?" step
     if (!currentUserName && newGroup.members.length > 0) {
-      // Stay open in who_are_you mode
+      // Prompt selection for the newly created members
     } else {
       setIsOnboardingOpen(false);
     }
@@ -105,6 +130,7 @@ export const App: React.FC = () => {
   const handleSelectUser = (userName: string) => {
     setCurrentUserName(userName);
     localStorage.setItem(`peersplit_user_${workspaceId}`, userName);
+    localStorage.setItem('peersplit_last_user', userName);
     setIsOnboardingOpen(false);
   };
 
@@ -115,22 +141,26 @@ export const App: React.FC = () => {
     });
   };
 
+  // Dedicated settlement handler - saves directly to settlements collection
   const handleSettleUp = (settlement: SettlementTransaction) => {
-    addExpense({
+    addSettlementRecord({
       id: `settle_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      description: `Settlement: ${settlement.from} → ${settlement.to}`,
+      from: settlement.from,
+      to: settlement.to,
       amount: settlement.amount,
       currency: settlement.currency,
-      payer: settlement.from,
-      participants: [settlement.to],
-      category: 'General',
-      note: 'Debt settlement transfer',
       timestamp: Date.now()
     });
   };
 
   const handleExportJson = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(expenses, null, 2));
+    const backup = {
+      workspaceId,
+      groupMeta,
+      expenses,
+      settlements: settlementRecords
+    };
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backup, null, 2));
     const a = document.createElement('a');
     a.href = dataStr;
     a.download = `peersplit-${workspaceId}-${Date.now()}.json`;
@@ -154,13 +184,23 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleImportJson = (importedItems: any[]) => {
-    for (const item of importedItems) {
-      if (item && item.amount && item.payer) {
-        addExpense({
-          ...item,
-          id: item.id || `exp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
-        });
+  const handleImportJson = (importedItems: any) => {
+    if (Array.isArray(importedItems)) {
+      for (const item of importedItems) {
+        if (item && item.amount && item.payer) {
+          addExpense({
+            ...item,
+            id: item.id || `exp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+          });
+        }
+      }
+    } else if (importedItems && typeof importedItems === 'object') {
+      if (importedItems.groupMeta) setGroupMeta(importedItems.groupMeta);
+      if (Array.isArray(importedItems.expenses)) {
+        importedItems.expenses.forEach((e: any) => addExpense(e));
+      }
+      if (Array.isArray(importedItems.settlements)) {
+        importedItems.settlements.forEach((s: any) => addSettlementRecord(s));
       }
     }
   };
@@ -195,35 +235,38 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex justify-center selection:bg-sky-500 selection:text-white">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex justify-center transition-colors duration-200">
       {/* Mobile-Friendly Native Container (max-w-md on desktop, 100% on mobile) */}
-      <div className="w-full max-w-md bg-slate-50 min-h-screen flex flex-col relative shadow-2xl pb-20">
+      <div className="w-full max-w-md bg-slate-50 dark:bg-slate-950 min-h-screen flex flex-col relative shadow-2xl pb-20 border-x border-slate-200/60 dark:border-slate-800/60">
         {/* Floating Minimal Sync Toast */}
         <SyncToast status={status} />
 
-        {/* Clean Mobile App Header */}
-        <Header
-          kernel={kernel}
-          status={status}
-          groupMeta={groupMeta}
-          currentUserName={currentUserName}
-          onOpenMeshModal={() => setIsMeshModalOpen(true)}
-          onOpenSwitchUser={() => setIsOnboardingOpen(true)}
-          onOpenNewGroup={handleOpenNewGroup}
-        />
+        {/* STICKY TOP CONTAINER: Greeting Header + Hero Spend Card remain fixed on scroll */}
+        <div className="sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md pb-1.5 border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm transition-colors duration-200">
+          <Header
+            kernel={kernel}
+            status={status}
+            groupMeta={groupMeta}
+            currentUserName={currentUserName}
+            isDark={isDark}
+            onToggleTheme={toggleTheme}
+            onOpenMeshModal={() => setIsMeshModalOpen(true)}
+            onOpenSwitchUser={() => setIsOnboardingOpen(true)}
+            onOpenNewGroup={handleOpenNewGroup}
+          />
 
-        {/* Hero Summary Card */}
-        <HeroSummaryCard
-          expenses={expenses}
-          groupMeta={groupMeta}
-          currentUserName={currentUserName}
-          userNetBalance={userNetBalance}
-          onOpenAddExpense={() => setIsExpenseFormOpen(true)}
-          onViewPayoffs={() => setActiveTab('settlements')}
-        />
+          <HeroSummaryCard
+            expenses={expenses}
+            groupMeta={groupMeta}
+            currentUserName={currentUserName}
+            userNetBalance={userNetBalance}
+            onOpenAddExpense={() => setIsExpenseFormOpen(true)}
+            onViewPayoffs={() => setActiveTab('settlements')}
+          />
+        </div>
 
-        {/* Tab Content */}
-        <main className="flex-1">
+        {/* SCROLLABLE MAIN CONTENT (Only expenses & settlements scroll) */}
+        <main className="flex-1 overflow-y-auto">
           {activeTab === 'expenses' ? (
             <ExpenseList
               expenses={expenses}
@@ -235,7 +278,9 @@ export const App: React.FC = () => {
             <DebtSettlementView
               balancesByCurrency={balancesByCurrency}
               settlementsByCurrency={settlementsByCurrency}
+              settlementHistory={settlementRecords}
               onSettleUp={handleSettleUp}
+              onDeleteSettlement={removeSettlementRecord}
               groupMeta={groupMeta}
               currentUserName={currentUserName}
             />
@@ -260,7 +305,7 @@ export const App: React.FC = () => {
           onClose={currentUserName ? () => setIsOnboardingOpen(false) : undefined}
         />
 
-        {/* Add Expense Form Modal (With Checkboxes as requested) */}
+        {/* Add Expense Form Modal (No scroll categories, auto-synced INR currency, member checkboxes) */}
         <ExpenseForm
           isOpen={isExpenseFormOpen}
           onClose={() => setIsExpenseFormOpen(false)}
@@ -269,7 +314,7 @@ export const App: React.FC = () => {
           currentUserName={currentUserName}
         />
 
-        {/* P2P Mesh Details Modal (Hidden behind header icon as requested) */}
+        {/* P2P Mesh Details Modal */}
         <MeshInspectorModal
           isOpen={isMeshModalOpen}
           onClose={() => setIsMeshModalOpen(false)}

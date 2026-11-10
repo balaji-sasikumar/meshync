@@ -1,14 +1,16 @@
-import type { Expense, NetBalance, SettlementTransaction } from './schema.ts';
+import type { Expense, NetBalance, SettlementTransaction, SettlementRecord } from './schema.ts';
 
 /**
- * Deterministically compute net balances per currency from the CRDT expense log.
- * Balances sum to exactly 0 for each currency.
+ * Deterministically compute net balances per currency from the CRDT expense log
+ * and offset settlement records. Balances sum to exactly 0 for each currency.
  */
 export function calculateNetBalances(
-  expenses: Expense[]
+  expenses: Expense[],
+  settlements: SettlementRecord[] = []
 ): Map<string, Map<string, number>> {
   const currencyBalances = new Map<string, Map<string, number>>();
 
+  // Process expenses
   for (const exp of expenses) {
     if (!exp.amount || exp.amount <= 0 || !exp.participants || exp.participants.length === 0) {
       continue;
@@ -35,6 +37,28 @@ export function calculateNetBalances(
     }
   }
 
+  // Process offset settlements (transfers between peers)
+  for (const st of settlements) {
+    if (!st.amount || st.amount <= 0 || !st.from || !st.to) {
+      continue;
+    }
+
+    const currency = st.currency || 'USD';
+    if (!currencyBalances.has(currency)) {
+      currencyBalances.set(currency, new Map());
+    }
+    const balances = currencyBalances.get(currency)!;
+
+    const fromPerson = st.from.trim();
+    const toPerson = st.to.trim();
+
+    // The payer of the settlement (debtor) reduces their debt (credits balance)
+    balances.set(fromPerson, (balances.get(fromPerson) || 0) + st.amount);
+
+    // The receiver of the settlement (creditor) has been reimbursed (debits balance)
+    balances.set(toPerson, (balances.get(toPerson) || 0) - st.amount);
+  }
+
   // Round balances to 4 decimal places to prevent floating point drift
   for (const [, balances] of currencyBalances) {
     for (const [person, val] of balances) {
@@ -59,36 +83,36 @@ export function simplifyDebtsForCurrency(
     balance: number;
   }
 
-  const debtors: Account[] = [];
   const creditors: Account[] = [];
+  const debtors: Account[] = [];
 
   for (const [person, balance] of balances.entries()) {
-    if (balance < -0.005) {
-      debtors.push({ person, balance: Math.abs(balance) });
-    } else if (balance > 0.005) {
+    // Ignore near-zero negligible balance (< 0.01 currency unit)
+    if (balance > 0.005) {
       creditors.push({ person, balance });
+    } else if (balance < -0.005) {
+      debtors.push({ person, balance: -balance });
     }
   }
 
-  // Deterministic sorting: sort by balance descending; if tied, sort alphabetically
-  debtors.sort((a, b) => b.balance - a.balance || a.person.localeCompare(b.person));
+  // Deterministic sorting: sort by highest balance descending, secondary by name alphabetically
   creditors.sort((a, b) => b.balance - a.balance || a.person.localeCompare(b.person));
+  debtors.sort((a, b) => b.balance - a.balance || a.person.localeCompare(b.person));
 
   const settlements: SettlementTransaction[] = [];
-  let dIdx = 0;
   let cIdx = 0;
-  let step = 0;
+  let dIdx = 0;
 
-  while (dIdx < debtors.length && cIdx < creditors.length) {
-    const debtor = debtors[dIdx];
+  while (cIdx < creditors.length && dIdx < debtors.length) {
     const creditor = creditors[cIdx];
+    const debtor = debtors[dIdx];
 
-    const amount = Math.min(debtor.balance, creditor.balance);
+    const amount = Math.min(creditor.balance, debtor.balance);
     const roundedAmount = Math.round(amount * 100) / 100;
 
     if (roundedAmount > 0) {
       settlements.push({
-        id: `settle_${debtor.person}_to_${creditor.person}_${step++}`,
+        id: `tx_${debtor.person}_${creditor.person}_${roundedAmount}_${currency}`,
         from: debtor.person,
         to: creditor.person,
         amount: roundedAmount,
@@ -114,12 +138,13 @@ export function simplifyDebtsForCurrency(
  * Compute all simplified debt settlements across all currencies.
  */
 export function computeAllSettlements(
-  expenses: Expense[]
+  expenses: Expense[],
+  settlements: SettlementRecord[] = []
 ): {
   balancesByCurrency: Map<string, NetBalance[]>;
   settlementsByCurrency: Map<string, SettlementTransaction[]>;
 } {
-  const currencyBalances = calculateNetBalances(expenses);
+  const currencyBalances = calculateNetBalances(expenses, settlements);
   const balancesByCurrency = new Map<string, NetBalance[]>();
   const settlementsByCurrency = new Map<string, SettlementTransaction[]>();
 

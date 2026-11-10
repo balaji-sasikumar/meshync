@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { User, Plus, X, Users, Sparkles, Check, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, X, Users, Check, ArrowRight } from 'lucide-react';
 import { SUPPORTED_CURRENCIES, SupportedCurrency, GroupMeta } from '../domain/schema.ts';
 import { getAvatarColor, getCurrencySymbol } from '../domain/ui-helpers.ts';
 
@@ -20,15 +20,23 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   onSelectUser,
   onClose
 }) => {
-  // If group exists, step is 'who_are_you', otherwise 'create_group'
   const isCreation = !groupMeta || !groupMeta.members || groupMeta.members.length === 0;
 
-  const [groupName, setGroupName] = useState(groupMeta?.name || 'My Trip & Expenses');
-  const [currency, setCurrency] = useState<SupportedCurrency>((groupMeta?.currency as SupportedCurrency) || 'USD');
-  const [members, setMembers] = useState<string[]>(groupMeta?.members || ['You', 'Alex', 'Sam']);
+  const [groupName, setGroupName] = useState(groupMeta?.name || 'Trip & Expenses');
+  const [currency, setCurrency] = useState<SupportedCurrency>((groupMeta?.currency as SupportedCurrency) || 'INR');
+  const [members, setMembers] = useState<string[]>(groupMeta?.members || []);
   const [newMemberInput, setNewMemberInput] = useState('');
   const [showAddNewMember, setShowAddNewMember] = useState(false);
   const [customNameInput, setCustomNameInput] = useState('');
+
+  // Keep state synced when remote peers sync group metadata
+  useEffect(() => {
+    if (groupMeta) {
+      if (groupMeta.name) setGroupName(groupMeta.name);
+      if (groupMeta.currency) setCurrency(groupMeta.currency as SupportedCurrency);
+      if (groupMeta.members && groupMeta.members.length > 0) setMembers(groupMeta.members);
+    }
+  }, [groupMeta]);
 
   if (!isOpen) return null;
 
@@ -42,13 +50,15 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   };
 
   const handleRemoveMember = (nameToRemove: string) => {
-    if (members.length <= 1) return;
     setMembers(members.filter(m => m !== nameToRemove));
   };
 
   const handleCreateGroupSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupName.trim() || members.length === 0) return;
+    if (!groupName.trim() || members.length < 2) {
+      alert('Please add at least 2 members to share bills.');
+      return;
+    }
 
     const newGroup: GroupMeta = {
       id: 'current_group',
@@ -79,24 +89,24 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white text-slate-900 w-full max-w-sm rounded-3xl shadow-2xl p-6 relative border border-sky-100 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full max-w-sm rounded-3xl shadow-2xl p-6 relative border border-sky-100 dark:border-slate-800 overflow-hidden">
         {/* Soft decorative background bubble */}
-        <div className="absolute -top-16 -right-16 w-36 h-36 bg-sky-200/50 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -top-16 -right-16 w-36 h-36 bg-sky-200/40 dark:bg-sky-900/20 rounded-full blur-2xl pointer-events-none" />
 
         {isCreation ? (
           /* Group Creation Form */
           <div>
-            <div className="text-center mb-5">
-              <div className="w-14 h-14 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
-                <Users className="w-7 h-7" />
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400 rounded-2xl flex items-center justify-center mx-auto mb-2.5 shadow-inner">
+                <Users className="w-6 h-6" />
               </div>
-              <h2 className="text-xl font-extrabold text-slate-900">Create New Group</h2>
-              <p className="text-xs text-slate-500 mt-1">Set up your shared bill & add your friends</p>
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Create New Group</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Add member names & set group currency</p>
             </div>
 
-            <form onSubmit={handleCreateGroupSubmit} className="space-y-4">
+            <form onSubmit={handleCreateGroupSubmit} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1">
                   Group Name
                 </label>
                 <input
@@ -104,25 +114,25 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   required
                   value={groupName}
                   onChange={e => setGroupName(e.target.value)}
-                  placeholder="e.g. Trip to Bali 🌴"
-                  className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
+                  placeholder="e.g. Goa Trip 🌴, Roommates 🏠"
+                  className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Currency
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1">
+                  Default Currency
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   {SUPPORTED_CURRENCIES.map(curr => (
                     <button
                       key={curr}
                       type="button"
                       onClick={() => setCurrency(curr)}
-                      className={`py-2 text-xs font-semibold rounded-xl border transition-all ${
+                      className={`py-1.5 text-xs font-bold rounded-xl border transition-all ${
                         currency === curr
                           ? 'bg-sky-500 border-sky-500 text-white shadow-sm'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750'
                       }`}
                     >
                       {getCurrencySymbol(curr)} {curr}
@@ -132,21 +142,25 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1">
                   Members List ({members.length})
                 </label>
 
                 {/* Member chips */}
-                <div className="flex flex-wrap gap-1.5 mb-2 max-h-32 overflow-y-auto p-1">
-                  {members.map(name => {
-                    const color = getAvatarColor(name);
-                    return (
-                      <span
-                        key={name}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${color.lightBg} ${color.lightText}`}
-                      >
-                        <span>{name}</span>
-                        {members.length > 1 && (
+                <div className="flex flex-wrap gap-1.5 mb-2 min-h-[44px] max-h-28 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
+                  {members.length === 0 ? (
+                    <span className="text-xs text-slate-400 italic self-center">
+                      Type names below and press Enter or Add...
+                    </span>
+                  ) : (
+                    members.map(name => {
+                      const color = getAvatarColor(name);
+                      return (
+                        <span
+                          key={name}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${color.lightBg} ${color.lightText}`}
+                        >
+                          <span>{name}</span>
                           <button
                             type="button"
                             onClick={() => handleRemoveMember(name)}
@@ -154,14 +168,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                           >
                             <X className="w-3 h-3" />
                           </button>
-                        )}
-                      </span>
-                    );
-                  })}
+                        </span>
+                      );
+                    })
+                  )}
                 </div>
 
                 {/* Add member input */}
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   <input
                     type="text"
                     value={newMemberInput}
@@ -172,14 +186,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                         handleAddMember();
                       }
                     }}
-                    placeholder="Friend's name..."
-                    className="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    placeholder="Friend's name (e.g. Balaji)..."
+                    className="flex-1 px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white"
                   />
                   <button
                     type="button"
                     onClick={() => handleAddMember()}
                     disabled={!newMemberInput.trim()}
-                    className="px-3 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 disabled:opacity-40 transition"
+                    className="px-3.5 py-1.5 bg-slate-800 dark:bg-slate-700 text-white rounded-xl text-xs font-bold hover:bg-slate-900 disabled:opacity-40 transition"
                   >
                     + Add
                   </button>
@@ -188,10 +202,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
               <button
                 type="submit"
-                disabled={members.length === 0}
-                className="w-full mt-2 py-3 bg-sky-500 hover:bg-sky-600 active:scale-[0.98] text-white font-bold rounded-2xl shadow-lg shadow-sky-500/25 transition-all flex items-center justify-center gap-2"
+                disabled={members.length < 2}
+                className="w-full mt-2 py-2.5 bg-sky-500 hover:bg-sky-600 active:scale-[0.98] text-white font-extrabold rounded-xl shadow-lg shadow-sky-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <span>Continue</span>
+                <span>Create Group</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -202,26 +216,26 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             {onClose && (
               <button
                 onClick={onClose}
-                className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             )}
 
-            <div className="text-center mb-6">
-              <span className="inline-block px-3 py-1 bg-sky-100 text-sky-800 text-xs font-bold rounded-full mb-2">
+            <div className="text-center mb-5">
+              <span className="inline-block px-3 py-1 bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 text-xs font-bold rounded-full mb-1.5">
                 {groupMeta.name}
               </span>
-              <h2 className="text-2xl font-extrabold text-slate-900">Who are you?</h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Select your name to track your expenses & payoffs
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white">Who are you?</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Select your name to track your balances and transactions
               </p>
             </div>
 
             {!showAddNewMember ? (
-              <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                 {groupMeta.members.map(name => {
-                  const isSelected = currentUserName === name;
+                  const isSelected = currentUserName?.toLowerCase() === name.toLowerCase();
                   const color = getAvatarColor(name);
                   return (
                     <button
@@ -229,18 +243,18 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                       onClick={() => onSelectUser(name)}
                       className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all text-left group ${
                         isSelected
-                          ? 'bg-sky-50 border-sky-400 shadow-sm'
-                          : 'bg-white border-slate-200 hover:border-sky-300 hover:bg-slate-50'
+                          ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-400 dark:border-sky-700 shadow-sm'
+                          : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-extrabold shadow-sm ${color.bg} ${color.text}`}
+                          className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shadow-sm ${color.bg} ${color.text}`}
                         >
                           {name.substring(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900 text-sm">{name}</p>
+                          <p className="font-bold text-slate-900 dark:text-white text-sm">{name}</p>
                           <p className="text-[11px] text-slate-400">Group Member</p>
                         </div>
                       </div>
@@ -250,7 +264,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                           <Check className="w-3.5 h-3.5" />
                         </div>
                       ) : (
-                        <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-sky-500 group-hover:translate-x-0.5 transition-all" />
+                        <ArrowRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-sky-500 group-hover:translate-x-0.5 transition-all" />
                       )}
                     </button>
                   );
@@ -259,16 +273,16 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddNewMember(true)}
-                  className="w-full py-2.5 px-3 border border-dashed border-slate-300 text-slate-600 rounded-2xl text-xs font-bold hover:border-sky-400 hover:text-sky-600 hover:bg-sky-50/50 transition-all flex items-center justify-center gap-1.5 mt-3"
+                  className="w-full py-2.5 px-3 border border-dashed border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-bold hover:border-sky-400 hover:text-sky-600 hover:bg-sky-50/50 dark:hover:bg-sky-950/20 transition-all flex items-center justify-center gap-1.5 mt-2.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>I'm not listed (Add my name)</span>
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleAddCustomUser} className="space-y-4">
+              <form onSubmit={handleAddCustomUser} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1">
                     Your Name
                   </label>
                   <input
@@ -278,7 +292,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     value={customNameInput}
                     onChange={e => setCustomNameInput(e.target.value)}
                     placeholder="Enter your name..."
-                    className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white"
                   />
                 </div>
 
@@ -286,14 +300,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowAddNewMember(false)}
-                    className="w-1/2 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200 transition"
+                    className="w-1/2 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                   >
                     Back to List
                   </button>
                   <button
                     type="submit"
                     disabled={!customNameInput.trim()}
-                    className="w-1/2 py-2.5 bg-sky-500 text-white font-bold rounded-xl text-xs hover:bg-sky-600 shadow-md shadow-sky-500/25 transition disabled:opacity-50"
+                    className="w-1/2 py-2 bg-sky-500 text-white font-bold rounded-xl text-xs hover:bg-sky-600 shadow-md shadow-sky-500/25 transition disabled:opacity-50"
                   >
                     Save & Continue
                   </button>
