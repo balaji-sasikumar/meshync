@@ -400,7 +400,7 @@ export const App: React.FC = () => {
       />
 
       {/* Reactive Mesh & Sync Notification Toast */}
-      <SyncToast kernel={kernel} status={status} />
+      <SyncToast status={status} />
     </div>
   );
 };
