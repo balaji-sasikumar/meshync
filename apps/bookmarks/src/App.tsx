@@ -1,18 +1,26 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useMeshKernel, useCollection } from '@localfirst/mesh-sync';
-import type { Bookmark } from './domain/schema.ts';
+import type { Bookmark, SpaceMeta } from './domain/schema.ts';
 import { Header } from './components/Header.tsx';
-import { PeerMeshInspector } from './components/PeerMeshInspector.tsx';
-import { BookmarkForm } from './components/BookmarkForm.tsx';
-import { BookmarkCard } from './components/BookmarkCard.tsx';
+import { BookmarkItem } from './components/BookmarkItem.tsx';
+import { AddBookmarkModal } from './components/AddBookmarkModal.tsx';
 import { TagFilter } from './components/TagFilter.tsx';
+import { MeshInspectorModal } from './components/MeshInspectorModal.tsx';
+import { UserOnboardingModal } from './components/UserOnboardingModal.tsx';
 import { SyncToast } from './components/SyncToast.tsx';
-import { Bookmark as BookmarkIcon, Loader2, ShieldAlert } from 'lucide-react';
+import { Bookmark as BookmarkIcon, Loader2, ShieldAlert, Plus } from 'lucide-react';
 
 export const App: React.FC = () => {
+  // 1. Decoupled headless mesh kernel
   const { kernel, status, isReady, error } = useMeshKernel();
 
-  // Strongly-typed reactive collection abstraction
+  // 2. CRDT Collections
+  const {
+    items: spaceMetaList,
+    add: addSpaceMeta,
+    update: updateSpaceMeta
+  } = useCollection<SpaceMeta>(kernel, 'space_meta');
+
   const {
     items: bookmarks,
     add: addBookmark,
@@ -20,11 +28,97 @@ export const App: React.FC = () => {
     remove: removeBookmark
   } = useCollection<Bookmark>(kernel, 'bookmarks');
 
+  const spaceMeta: SpaceMeta | null = spaceMetaList[0] || null;
+
+  // 3. Theme State (Light / Dark mode)
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('mesh_bookmarks_theme') === 'dark';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('mesh_bookmarks_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('mesh_bookmarks_theme', 'light');
+    }
+  }, [isDark]);
+
+  const toggleTheme = () => setIsDark(prev => !prev);
+
+  // 4. User Identity & Onboarding State
+  const workspaceId = kernel?.credentials.workspaceId || 'default';
+  const [currentUserName, setCurrentUserName] = useState<string>('');
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+
+  // Detect whether opened via an existing shared link (#workspaceId:passphrase)
+  const isSharedLink = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(window.location.hash && window.location.hash.includes(':'));
+  }, []);
+
+  useEffect(() => {
+    if (!isReady || !workspaceId) return;
+
+    const storageKey = `mesh_bookmarks_user_${workspaceId}`;
+    const savedWorkspaceUser = localStorage.getItem(storageKey);
+    const savedLastUser = localStorage.getItem('mesh_bookmarks_last_user');
+
+    const isValidName = (name: string | null) => Boolean(name && name.toLowerCase() !== 'you');
+
+    if (isValidName(savedWorkspaceUser)) {
+      setCurrentUserName(savedWorkspaceUser!);
+      setIsOnboardingOpen(false);
+    } else if (isValidName(savedLastUser) && spaceMeta?.members?.some(m => m.toLowerCase() === savedLastUser!.toLowerCase())) {
+      setCurrentUserName(savedLastUser!);
+      localStorage.setItem(storageKey, savedLastUser!);
+      setIsOnboardingOpen(false);
+    } else {
+      setIsOnboardingOpen(true);
+    }
+  }, [isReady, workspaceId, spaceMeta?.members]);
+
+  const handleSelectUser = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setCurrentUserName(trimmed);
+    localStorage.setItem(`mesh_bookmarks_user_${workspaceId}`, trimmed);
+    localStorage.setItem('mesh_bookmarks_last_user', trimmed);
+    setIsOnboardingOpen(false);
+
+    // Sync member into space_meta so other peers see the new member
+    if (spaceMeta) {
+      if (!spaceMeta.members.some(m => m.toLowerCase() === trimmed.toLowerCase())) {
+        updateSpaceMeta(spaceMeta.id, {
+          members: [...spaceMeta.members, trimmed]
+        });
+      }
+    } else {
+      addSpaceMeta({
+        id: 'space_root',
+        name: 'Shared Bookmarks',
+        members: [trimmed],
+        createdAt: Date.now()
+      });
+    }
+  };
+
+  // 5. Modals State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
+  const [isMeshModalOpen, setIsMeshModalOpen] = useState(false);
+
+  // 6. Search & Filters State
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [filterPinned, setFilterPinned] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
-  // Compute all unique tags across all stored bookmarks
+  // Compute all unique tags across bookmarks
   const allTags = useMemo(() => {
     const set = new Set<string>();
     for (const b of bookmarks) {
@@ -33,13 +127,17 @@ export const App: React.FC = () => {
     return Array.from(set).sort();
   }, [bookmarks]);
 
+  const pinnedCount = useMemo(() => {
+    return bookmarks.filter(b => b.pinned && (!showArchived ? !b.archived : b.archived)).length;
+  }, [bookmarks, showArchived]);
+
   // Filtered bookmarks list: pinned first, then chronological
   const filteredBookmarks = useMemo(() => {
     return bookmarks
-      .filter((b) => {
+      .filter(b => {
         if (!showArchived && b.archived) return false;
         if (showArchived && !b.archived) return false;
-
+        if (filterPinned && !b.pinned) return false;
         if (selectedTag && !b.tags.includes(selectedTag)) return false;
 
         if (searchTerm.trim()) {
@@ -47,27 +145,46 @@ export const App: React.FC = () => {
           const matchTitle = b.title.toLowerCase().includes(q);
           const matchUrl = b.url.toLowerCase().includes(q);
           const matchDesc = b.description?.toLowerCase().includes(q);
-          const matchTag = b.tags.some((t) => t.toLowerCase().includes(q));
-          if (!matchTitle && !matchUrl && !matchDesc && !matchTag) return false;
+          const matchAuthor = b.author?.toLowerCase().includes(q);
+          const matchTag = b.tags.some(t => t.toLowerCase().includes(q));
+          if (!matchTitle && !matchUrl && !matchDesc && !matchAuthor && !matchTag) return false;
         }
 
         return true;
       })
       .sort((a, b) => {
-        // Pinned bookmarks first
         if (a.pinned && !b.pinned) return -1;
         if (!a.pinned && b.pinned) return 1;
         return b.createdAt - a.createdAt;
       });
-  }, [bookmarks, selectedTag, searchTerm, showArchived]);
+  }, [bookmarks, selectedTag, filterPinned, searchTerm, showArchived]);
 
-  const handleAddBookmark = (data: Omit<Bookmark, 'id' | 'createdAt' | 'updatedAt'>) => {
-    addBookmark({
-      ...data,
-      id: `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    });
+  // 7. Handlers for Bookmarks
+  const handleSaveBookmark = (
+    data: Omit<Bookmark, 'id' | 'createdAt' | 'updatedAt'>,
+    editId?: string
+  ) => {
+    if (editId) {
+      updateBookmark(editId, {
+        ...data,
+        updatedAt: Date.now()
+      });
+    } else {
+      addBookmark({
+        ...data,
+        id: `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        author: currentUserName || 'Anonymous',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+    }
+    setIsAddModalOpen(false);
+    setEditingBookmark(null);
+  };
+
+  const handleEditClick = (bm: Bookmark) => {
+    setEditingBookmark(bm);
+    setIsAddModalOpen(true);
   };
 
   const handleTogglePin = (id: string, current: boolean) => {
@@ -78,18 +195,34 @@ export const App: React.FC = () => {
     updateBookmark(id, { archived: !current, updatedAt: Date.now() });
   };
 
-  const handleSwitchWorkspace = (newHash: string) => {
-    if (typeof window !== 'undefined') {
-      window.location.hash = newHash;
-    }
-  };
-
   const handleExportJson = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(bookmarks, null, 2));
     const a = document.createElement('a');
     a.href = dataStr;
-    a.download = `bookmarks-${kernel?.credentials.workspaceId || 'backup'}-${Date.now()}.json`;
+    a.download = `bookmarks-${workspaceId}-${Date.now()}.json`;
     a.click();
+  };
+
+  const handleImportJson = (items: any[]) => {
+    let imported = 0;
+    for (const item of items) {
+      if (item && item.url && item.title) {
+        addBookmark({
+          id: item.id || `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          url: item.url,
+          title: item.title,
+          description: item.description || '',
+          tags: Array.isArray(item.tags) ? item.tags : [],
+          pinned: Boolean(item.pinned),
+          archived: Boolean(item.archived),
+          author: item.author || currentUserName || 'Imported',
+          createdAt: item.createdAt || Date.now(),
+          updatedAt: Date.now()
+        });
+        imported++;
+      }
+    }
+    alert(`Successfully imported ${imported} bookmarks!`);
   };
 
   const handleExportSnapshot = async () => {
@@ -111,86 +244,160 @@ export const App: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <div className="bg-rose-950/40 border border-rose-800 rounded-xl p-6 max-w-md text-center">
-          <ShieldAlert className="w-12 h-12 text-rose-400 mx-auto mb-3" />
-          <h2 className="text-base font-bold text-rose-200">Mesh Sync Initialization Error</h2>
-          <p className="text-xs text-rose-300/80 mt-1 font-mono">{error.message}</p>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-3xl p-6 max-w-sm text-center shadow-lg">
+          <ShieldAlert className="w-10 h-10 text-rose-500 mx-auto mb-3" />
+          <h2 className="text-base font-bold text-rose-800 dark:text-rose-200">Mesh Engine Error</h2>
+          <p className="text-xs text-rose-600 dark:text-rose-300/80 mt-1 font-mono">{error.message}</p>
         </div>
       </div>
     );
   }
 
-  if (!isReady) {
+  if (!isReady || !status) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
-        <Loader2 className="w-10 h-10 text-indigo-400 animate-spin mb-3" />
-        <h2 className="text-sm font-semibold text-slate-300">Initializing Mesh Engine...</h2>
-        <p className="text-xs text-slate-500 mt-1 font-mono">Deriving Keys & Loading Local Storage</p>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 text-sky-500 animate-spin mb-3" />
+        <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">Initializing Mesh Space...</h2>
+        <p className="text-xs text-slate-400 mt-1 font-mono">Deriving AES-GCM Key & CRDT Storage</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col">
-      <Header
-        kernel={kernel}
-        status={status}
-        onSwitchWorkspace={handleSwitchWorkspace}
-        onExportJson={handleExportJson}
-        onExportSnapshot={handleExportSnapshot}
-      />
-
-      <main className="max-w-6xl mx-auto px-4 pb-16 flex-1 w-full">
-        {/* Peer Mesh Inspector */}
-        <PeerMeshInspector kernel={kernel} status={status} />
-
-        {/* Add Bookmark Form */}
-        <BookmarkForm onAddBookmark={handleAddBookmark} existingTags={allTags} />
-
-        {/* Filter Bar */}
-        <TagFilter
-          tags={allTags}
-          selectedTag={selectedTag}
-          onSelectTag={setSelectedTag}
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          showArchived={showArchived}
-          onToggleShowArchived={() => setShowArchived(!showArchived)}
-          totalCount={bookmarks.length}
-          filteredCount={filteredBookmarks.length}
+    <div className="min-h-screen bg-slate-50/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200">
+      {/* Mobile-First Centered Container */}
+      <div className="w-full max-w-xl mx-auto flex-1 flex flex-col">
+        {/* Modern Top Header */}
+        <Header
+          kernel={kernel}
+          status={status}
+          spaceMeta={spaceMeta}
+          currentUserName={currentUserName}
+          isDark={isDark}
+          onToggleTheme={toggleTheme}
+          onOpenMeshModal={() => setIsMeshModalOpen(true)}
+          onOpenSwitchUser={() => setIsOnboardingOpen(true)}
+          onAddBookmark={() => {
+            setEditingBookmark(null);
+            setIsAddModalOpen(true);
+          }}
         />
 
-        {/* Bookmarks Grid */}
-        {filteredBookmarks.length === 0 ? (
-          <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-12 text-center text-slate-500 space-y-2">
-            <BookmarkIcon className="w-10 h-10 mx-auto text-slate-700" />
-            <p className="font-semibold text-sm text-slate-400">No bookmarks found</p>
-            <p className="text-xs text-slate-600">
-              {bookmarks.length === 0
-                ? 'Save your first link above to synchronize across tabs and peers!'
-                : 'No links match your current search and tag filters.'}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredBookmarks.map((bm) => (
-              <BookmarkCard
-                key={bm.id}
-                bookmark={bm}
-                onTogglePin={handleTogglePin}
-                onToggleArchive={handleToggleArchive}
-                onDelete={removeBookmark}
-                onSelectTag={(t) => setSelectedTag(t)}
-              />
-            ))}
-          </div>
-        )}
-      </main>
+        {/* Content Body */}
+        <main className="px-4 pt-2 pb-24 flex-1">
+          {/* Tag Filter & Search */}
+          <TagFilter
+            tags={allTags}
+            selectedTag={selectedTag}
+            onSelectTag={setSelectedTag}
+            filterPinned={filterPinned}
+            onToggleFilterPinned={() => setFilterPinned(p => !p)}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            showArchived={showArchived}
+            onToggleShowArchived={() => setShowArchived(a => !a)}
+            totalCount={bookmarks.length}
+            filteredCount={filteredBookmarks.length}
+            pinnedCount={pinnedCount}
+          />
 
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 font-mono">
-        MeshBookmarks • Zero-Server Local-First Architecture • Web Crypto + Yjs CRDT + WebRTC + IPFS
-      </footer>
+          {/* Bookmarks List */}
+          {filteredBookmarks.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 text-center shadow-sm space-y-3 mt-2">
+              <div className="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/60 text-sky-500 mx-auto flex items-center justify-center">
+                <BookmarkIcon className="w-6 h-6" />
+              </div>
+              <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-200">
+                {bookmarks.length === 0 ? 'No bookmarks saved yet' : 'No links match your filter'}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+                {bookmarks.length === 0
+                  ? 'Tap the button below or in the top bar to save your first link to this encrypted P2P space.'
+                  : 'Try clearing your search or tag filters to see more links.'}
+              </p>
+              {bookmarks.length === 0 && (
+                <button
+                  onClick={() => {
+                    setEditingBookmark(null);
+                    setIsAddModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-md transition active:scale-95 inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add First Bookmark</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {filteredBookmarks.map(bm => (
+                <BookmarkItem
+                  key={bm.id}
+                  bookmark={bm}
+                  currentUserName={currentUserName}
+                  onTogglePin={handleTogglePin}
+                  onToggleArchive={handleToggleArchive}
+                  onDelete={removeBookmark}
+                  onEdit={handleEditClick}
+                  onSelectTag={t => setSelectedTag(t)}
+                />
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Floating Bottom Add Button (Mobile Friendly) */}
+      <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-30">
+        <button
+          onClick={() => {
+            setEditingBookmark(null);
+            setIsAddModalOpen(true);
+          }}
+          className="w-13 h-13 sm:w-14 sm:h-14 p-3.5 rounded-full bg-sky-500 hover:bg-sky-600 text-white shadow-xl flex items-center justify-center transition active:scale-90 hover:scale-105"
+          title="Add New Link"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Add / Edit Bookmark Modal */}
+      <AddBookmarkModal
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingBookmark(null);
+        }}
+        onSubmit={handleSaveBookmark}
+        editingBookmark={editingBookmark}
+        existingTags={allTags}
+        currentUserName={currentUserName}
+      />
+
+      {/* User Onboarding / Identity Modal */}
+      <UserOnboardingModal
+        isOpen={isOnboardingOpen}
+        currentUserName={currentUserName}
+        existingMembers={spaceMeta?.members || []}
+        onSelectUser={handleSelectUser}
+        onClose={() => setIsOnboardingOpen(false)}
+        isSharedLink={isSharedLink}
+        peersCount={status?.peersCount || 0}
+      />
+
+      {/* Decentralized P2P Mesh Network Modal (Telemetry, IPFS, Backups) */}
+      <MeshInspectorModal
+        isOpen={isMeshModalOpen}
+        onClose={() => setIsMeshModalOpen(false)}
+        kernel={kernel}
+        status={status}
+        spaceMeta={spaceMeta}
+        onUpdateSpaceMeta={meta => updateSpaceMeta(meta.id, meta)}
+        onExportJson={handleExportJson}
+        onExportSnapshot={handleExportSnapshot}
+        onImportJson={handleImportJson}
+      />
 
       {/* Reactive Mesh & Sync Notification Toast */}
       <SyncToast kernel={kernel} status={status} />
