@@ -3,7 +3,22 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'webrtc-signaling-relay',
+      configureServer(server) {
+        server.ws.on('mesh:signal', (data, client) => {
+          // Broadcast to all other connected tabs (including incognito)
+          server.ws.clients.forEach((c) => {
+            if (c !== client) {
+              c.send({ type: 'custom', event: 'mesh:signal', data });
+            }
+          });
+        });
+      }
+    }
+  ],
   resolve: {
     alias: {
       '@localfirst/mesh-sync': path.resolve(__dirname, '../../packages/mesh-sync/src/index.ts')

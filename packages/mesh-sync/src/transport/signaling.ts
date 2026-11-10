@@ -15,8 +15,35 @@ export class MultiBrokerSignaling {
   private sockets: Map<string, WebSocket> = new Map();
   private reconnectTimers: Map<string, number> = new Map();
   private isDestroyed = false;
+  private hotRelayHandler?: (eventData: any) => void;
 
-  constructor(private options: SignalingBrokerOptions) {}
+  constructor(private options: SignalingBrokerOptions) {
+    this.initHotRelay();
+  }
+
+  /**
+   * Set up local Vite HMR relay for instantaneous local dev signaling across
+   * normal, incognito, and different browser windows without any third-party server dependency.
+   */
+  private initHotRelay(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const hot = (import.meta as any)?.hot;
+      if (hot && typeof hot.on === 'function') {
+        this.hotRelayHandler = (payload: any) => {
+          if (!payload || payload.room !== this.options.room) return;
+          if (payload.from === this.options.peerId) return;
+
+          const data = payload.data || payload;
+          if (data.target && data.target !== this.options.peerId) return;
+
+          this.options.onSignal(payload.from, data);
+        };
+
+        hot.on('mesh:signal', this.hotRelayHandler);
+      }
+    } catch {}
+  }
 
   public connect(): void {
     if (this.isDestroyed || typeof WebSocket === 'undefined') return;
@@ -111,7 +138,7 @@ export class MultiBrokerSignaling {
   }
 
   /**
-   * Broadcast or target a signal through all connected brokers.
+   * Broadcast or target a signal through all connected brokers and local dev relay.
    */
   public broadcastSignal(signalData: Record<string, unknown>): void {
     const payload = {
@@ -119,6 +146,19 @@ export class MultiBrokerSignaling {
       from: this.options.peerId
     };
 
+    // 1. Send via local dev HMR relay (reaches incognito tabs instantly)
+    try {
+      const hot = (import.meta as any)?.hot;
+      if (hot && typeof hot.send === 'function') {
+        hot.send('mesh:signal', {
+          room: this.options.room,
+          from: this.options.peerId,
+          data: payload
+        });
+      }
+    } catch {}
+
+    // 2. Send via connected WebSocket signaling brokers
     const envelope = JSON.stringify({
       type: 'publish',
       topic: this.options.room,

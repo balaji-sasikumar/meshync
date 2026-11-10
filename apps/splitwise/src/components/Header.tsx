@@ -28,6 +28,7 @@ interface Props {
   onSwitchWorkspace: (hash: string) => void;
   onExportSnapshot?: () => void;
   onExportJson?: () => void;
+  onImportJson?: (data: any[]) => void;
 }
 
 export const Header: React.FC<Props> = ({
@@ -35,7 +36,8 @@ export const Header: React.FC<Props> = ({
   status,
   onSwitchWorkspace,
   onExportSnapshot,
-  onExportJson
+  onExportJson,
+  onImportJson
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedWsId, setCopiedWsId] = useState(false);
@@ -224,6 +226,34 @@ export const Header: React.FC<Props> = ({
                   <span>Export Encrypted Snapshot</span>
                   <span className="text-[10px] text-amber-500 font-mono">.bin</span>
                 </button>
+
+                <label className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors flex items-center justify-between cursor-pointer">
+                  <span>Import Data / Backup</span>
+                  <span className="text-[10px] text-emerald-400 font-mono">upload</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          try {
+                            const parsed = JSON.parse(event.target?.result as string);
+                            if (Array.isArray(parsed)) {
+                              onImportJson?.(parsed);
+                            }
+                          } catch (err) {
+                            alert('Failed to parse JSON file');
+                          }
+                        };
+                        reader.readAsText(file);
+                      }
+                      setShowBackupMenu(false);
+                    }}
+                  />
+                </label>
               </div>
             )}
           </div>

@@ -8,6 +8,7 @@ import { ExpenseForm } from './components/ExpenseForm.tsx';
 import { ExpenseList } from './components/ExpenseList.tsx';
 import { DebtSettlementView } from './components/DebtSettlementView.tsx';
 import { StatsCard } from './components/StatsCard.tsx';
+import { SyncToast } from './components/SyncToast.tsx';
 import { Receipt, Scale, ShieldAlert, Loader2 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -92,6 +93,17 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleImportJson = (importedItems: any[]) => {
+    for (const item of importedItems) {
+      if (item && item.amount && item.payer) {
+        addExpense({
+          ...item,
+          id: item.id || `exp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+        });
+      }
+    }
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
@@ -122,6 +134,7 @@ export const App: React.FC = () => {
         onSwitchWorkspace={handleSwitchWorkspace}
         onExportJson={handleExportJson}
         onExportSnapshot={handleExportSnapshot}
+        onImportJson={handleImportJson}
       />
 
       <main className="max-w-6xl mx-auto px-4 pb-16 flex-1 w-full">
@@ -180,6 +193,9 @@ export const App: React.FC = () => {
       <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 font-mono">
         PeerSplit • Zero-Server Local-First Mesh Architecture • Web Crypto + CRDT + WebRTC + IPFS
       </footer>
+
+      {/* Reactive Mesh & Sync Notification Toast */}
+      <SyncToast kernel={kernel} status={status} />
     </div>
   );
 };

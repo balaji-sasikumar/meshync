@@ -6,6 +6,7 @@ import { PeerMeshInspector } from './components/PeerMeshInspector.tsx';
 import { BookmarkForm } from './components/BookmarkForm.tsx';
 import { BookmarkCard } from './components/BookmarkCard.tsx';
 import { TagFilter } from './components/TagFilter.tsx';
+import { SyncToast } from './components/SyncToast.tsx';
 import { Bookmark as BookmarkIcon, Loader2, ShieldAlert } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -190,6 +191,9 @@ export const App: React.FC = () => {
       <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-600 font-mono">
         MeshBookmarks • Zero-Server Local-First Architecture • Web Crypto + Yjs CRDT + WebRTC + IPFS
       </footer>
+
+      {/* Reactive Mesh & Sync Notification Toast */}
+      <SyncToast kernel={kernel} status={status} />
     </div>
   );
 };

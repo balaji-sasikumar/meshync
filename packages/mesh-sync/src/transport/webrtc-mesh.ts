@@ -33,8 +33,9 @@ interface PeerConnectionWrapper {
 }
 
 const DEFAULT_SIGNALING_URLS = [
-  'wss://signaling.yjs.dev',
-  'wss://y-webrtc-signaling-eu.herokuapp.com'
+  'ws://localhost:4444',
+  'wss://signaling.fly.dev',
+  'wss://signaling.yjs.dev'
 ];
 
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
