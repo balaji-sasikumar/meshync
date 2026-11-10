@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useMeshKernel, useCollection } from '@localfirst/mesh-sync';
 import type { Bookmark, SpaceMeta } from './domain/schema.ts';
 import { Header } from './components/Header.tsx';
-import { BookmarkHeroCard } from './components/BookmarkHeroCard.tsx';
 import { BookmarkItem } from './components/BookmarkItem.tsx';
 import { AddBookmarkModal } from './components/AddBookmarkModal.tsx';
 import { TagFilter } from './components/TagFilter.tsx';
@@ -272,8 +271,8 @@ export const App: React.FC = () => {
         {/* Floating Minimal Sync Toast */}
         <SyncToast status={status} />
 
-        {/* STICKY TOP CONTAINER: Greeting Header + Hero Card */}
-        <div className="sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md pb-1.5 border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm transition-colors duration-200">
+        {/* STICKY TOP CONTAINER: Greeting Header */}
+        <div className="sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md pb-2 border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm transition-colors duration-200">
           <Header
             kernel={kernel}
             status={status}
@@ -283,15 +282,6 @@ export const App: React.FC = () => {
             onToggleTheme={toggleTheme}
             onOpenMeshModal={() => setIsMeshModalOpen(true)}
             onOpenSwitchUser={() => setIsOnboardingOpen(true)}
-          />
-
-          <BookmarkHeroCard
-            bookmarks={bookmarks}
-            spaceMeta={spaceMeta}
-            onOpenAddBookmark={() => {
-              setEditingBookmark(null);
-              setIsAddModalOpen(true);
-            }}
           />
         </div>
 
@@ -315,14 +305,14 @@ export const App: React.FC = () => {
 
           {/* Bookmarks List */}
           {filteredBookmarks.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 rounded-3xl p-8 text-center shadow-sm space-y-3 mt-3">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-sky-500/10 to-indigo-500/10 text-sky-600 dark:text-sky-400 mx-auto flex items-center justify-center shadow-inner">
-                <BookmarkIcon className="w-7 h-7" />
+            <div className="bg-white/80 dark:bg-slate-900/80 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm space-y-2.5 mt-2">
+              <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-500 mx-auto flex items-center justify-center">
+                <BookmarkIcon className="w-5 h-5" />
               </div>
-              <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-200">
+              <h3 className="font-extrabold text-xs text-slate-800 dark:text-slate-200">
                 {bookmarks.length === 0 ? 'No bookmarks saved yet' : 'No links match your filter'}
               </h3>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+              <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
                 {bookmarks.length === 0
                   ? 'Tap the button below to save your first link to this encrypted P2P space.'
                   : 'Try clearing your search or tag filters to see more links.'}
@@ -333,9 +323,9 @@ export const App: React.FC = () => {
                     setEditingBookmark(null);
                     setIsAddModalOpen(true);
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-md shadow-sky-500/20 transition active:scale-95 inline-flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-sm transition active:scale-95 inline-flex items-center gap-1.5"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5" />
                   <span>Add First Bookmark</span>
                 </button>
               )}
