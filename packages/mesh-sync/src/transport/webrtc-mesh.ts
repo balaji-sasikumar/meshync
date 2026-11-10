@@ -52,6 +52,7 @@ export class WebRTCMeshTransport {
   private docUnsubscribe?: () => void;
   private pendingCandidates = new Map<string, RTCIceCandidateInit[]>();
   private heartbeatInterval?: number;
+  private isPaused = false;
 
   constructor(private options: WebRTCMeshOptions) {
     this.peerId = this.generatePeerId();
@@ -83,11 +84,64 @@ export class WebRTCMeshTransport {
   }
 
   public start(): void {
-    if (this.isDestroyed) return;
+    if (this.isDestroyed || this.isPaused) return;
     this.signaling.connect();
 
     // Trigger instant vector-clock sync across tabs via BroadcastChannel
     this.broadcastStateVector();
+  }
+
+  /**
+   * Pause mesh networking to simulate a network partition or offline mode.
+   */
+  public pause(): void {
+    if (this.isPaused || this.isDestroyed) return;
+    this.isPaused = true;
+
+    // Close all current WebRTC peer connections
+    for (const peerId of Array.from(this.connections.keys())) {
+      this.cleanupPeer(peerId);
+    }
+
+    // Close signaling
+    this.signaling.destroy();
+
+    // Close BroadcastChannel
+    if (this.broadcastChannel) {
+      this.broadcastChannel.close();
+      this.broadcastChannel = null;
+    }
+
+    this.emitPeerChanges();
+  }
+
+  /**
+   * Resume mesh networking after partition simulation, reconnecting and reconciling state.
+   */
+  public resume(): void {
+    if (!this.isPaused || this.isDestroyed) return;
+    this.isPaused = false;
+
+    // Re-instantiate signaling
+    const signalingUrls = this.options.signalingUrls?.length
+      ? this.options.signalingUrls
+      : DEFAULT_SIGNALING_URLS;
+
+    this.signaling = new MultiBrokerSignaling({
+      urls: signalingUrls,
+      room: this.options.fingerprint,
+      peerId: this.peerId,
+      onSignal: this.handleSignal.bind(this)
+    });
+
+    this.initBroadcastChannel();
+    this.signaling.connect();
+    this.broadcastStateVector();
+    this.emitPeerChanges();
+  }
+
+  public get isOfflineSimulated(): boolean {
+    return this.isPaused;
   }
 
   /**

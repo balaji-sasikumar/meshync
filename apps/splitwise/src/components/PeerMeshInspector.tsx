@@ -11,7 +11,9 @@ import {
   ServerOff,
   ChevronDown,
   ChevronUp,
-  Cpu
+  Cpu,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 interface Props {
@@ -78,10 +80,21 @@ export const PeerMeshInspector: React.FC<Props> = ({ kernel, status }) => {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-sm text-slate-200">
-                P2P Mesh Kernel: {status.peersCount > 0 ? 'Active Mesh' : 'Offline / Local-Only'}
+                P2P Mesh Kernel:{' '}
+                {status.isSimulatedOffline
+                  ? 'Simulated Network Partition'
+                  : status.peersCount > 0
+                  ? 'Active Mesh'
+                  : 'Offline / Local-Only'}
               </span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                Zero-Server
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-mono border ${
+                  status.isSimulatedOffline
+                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                }`}
+              >
+                {status.isSimulatedOffline ? 'Partitioned' : 'Zero-Server'}
               </span>
             </div>
             <p className="text-xs text-slate-400 font-mono mt-0.5">
@@ -90,9 +103,28 @@ export const PeerMeshInspector: React.FC<Props> = ({ kernel, status }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-slate-400 text-xs font-medium">
-          <span>Engine Details</span>
-          {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              kernel.toggleOfflineSimulation();
+            }}
+            className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              status.isSimulatedOffline
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+            title="Disconnect WebRTC and BroadcastChannel to test offline mutations and CRDT reconciliation"
+          >
+            {status.isSimulatedOffline ? <WifiOff className="w-3.5 h-3.5 text-rose-400" /> : <Wifi className="w-3.5 h-3.5 text-emerald-400" />}
+            <span>{status.isSimulatedOffline ? 'Reconnect Mesh' : 'Simulate Offline'}</span>
+          </button>
+
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium">
+            <span>Details</span>
+            {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </div>
         </div>
       </button>
 

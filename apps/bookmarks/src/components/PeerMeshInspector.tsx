@@ -10,7 +10,9 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
-  Cpu
+  Cpu,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 interface Props {
@@ -77,10 +79,21 @@ export const PeerMeshInspector: React.FC<Props> = ({ kernel, status }) => {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-sm text-slate-200">
-                P2P Mesh Kernel: {status.peersCount > 0 ? 'Active Mesh' : 'Offline / Local-Only'}
+                P2P Mesh Kernel:{' '}
+                {status.isSimulatedOffline
+                  ? 'Simulated Network Partition'
+                  : status.peersCount > 0
+                  ? 'Active Mesh'
+                  : 'Offline / Local-Only'}
               </span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
-                Decentralized
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-mono border ${
+                  status.isSimulatedOffline
+                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                    : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                }`}
+              >
+                {status.isSimulatedOffline ? 'Partitioned' : 'Decentralized'}
               </span>
             </div>
             <p className="text-xs text-slate-400 font-mono mt-0.5">

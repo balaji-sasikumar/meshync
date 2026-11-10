@@ -27,6 +27,7 @@ export interface MeshKernelStatus {
   workspaceId: string;
   fingerprint: string;
   isOnline: boolean;
+  isSimulatedOffline: boolean;
   peersCount: number;
   peers: PeerInfo[];
   lastSyncTimestamp: number;
@@ -169,16 +170,38 @@ export class MeshKernel {
    */
   public getStatus(): MeshKernelStatus {
     const peers = this.transport.getConnectedPeers();
+    const isSimulated = this.transport.isOfflineSimulated;
     return {
       workspaceId: this.credentials.workspaceId,
       fingerprint: this.fingerprint,
-      isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      isOnline: isSimulated ? false : typeof navigator !== 'undefined' ? navigator.onLine : true,
+      isSimulatedOffline: isSimulated,
       peersCount: peers.length,
       peers,
       lastSyncTimestamp: this.lastSyncTimestamp,
       latestIpfsCid: this.ipfsRelay.getLatestCid(),
       isPersisted: true
     };
+  }
+
+  /**
+   * Toggle offline network partition simulation.
+   * When enabled, WebRTC and BroadcastChannel transports are severed, buffering edits in IndexedDB.
+   * When disabled, the mesh reconnects and vector clocks reconcile automatically.
+   */
+  public setOfflineSimulation(offline: boolean): void {
+    if (offline) {
+      this.transport.pause();
+    } else {
+      this.transport.resume();
+    }
+    this.notifyStatusChange();
+  }
+
+  public toggleOfflineSimulation(): boolean {
+    const newState = !this.transport.isOfflineSimulated;
+    this.setOfflineSimulation(newState);
+    return newState;
   }
 
   /**
