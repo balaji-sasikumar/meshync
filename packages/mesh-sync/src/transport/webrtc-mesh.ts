@@ -40,8 +40,8 @@ const isLocalhost =
 
 const DEFAULT_SIGNALING_URLS = [
   'wss://signaling.fly.dev',
+  'wss://y-webrtc.fly.dev',
   'wss://y-webrtc-signaling.fly.dev',
-  'wss://signaling.yjs.dev',
   ...(isLocalhost ? ['ws://localhost:4444'] : [])
 ];
 
@@ -204,7 +204,13 @@ export class WebRTCMeshTransport {
     if (typeof setInterval === 'undefined') return;
     this.heartbeatInterval = setInterval(() => {
       this.sendPingToAll();
-    }, 15000) as unknown as number;
+      // Periodically announce if we have no peers yet or to discover newly joined peers
+      if (this.connections.size === 0 && !this.isPaused) {
+        this.signaling.broadcastSignal({
+          type: 'announce'
+        });
+      }
+    }, 10000) as unknown as number;
   }
 
   /**
@@ -303,10 +309,17 @@ export class WebRTCMeshTransport {
 
     // Peer announcement: polite peer pattern for WebRTC glare resolution
     if (data.type === 'announce') {
-      // Deterministically decide initiator: lexicographical comparison
+      if (this.connections.has(senderPeerId)) return;
+
       const isInitiator = this.peerId > senderPeerId;
-      if (isInitiator && !this.connections.has(senderPeerId)) {
+      if (isInitiator) {
         await this.createPeerConnection(senderPeerId, true);
+      } else {
+        // Non-initiator: reply with an announce targeted to sender so newcomer knows we are in the room!
+        this.signaling.broadcastSignal({
+          type: 'announce',
+          target: senderPeerId
+        });
       }
       return;
     }

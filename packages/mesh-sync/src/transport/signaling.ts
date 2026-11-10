@@ -88,8 +88,9 @@ export class MultiBrokerSignaling {
 
           const msg = JSON.parse(raw);
           // Handle standard y-webrtc / custom signaling relay schema
-          if (msg.type === 'publish' && msg.topic === this.options.room && msg.data) {
-            const data = msg.data;
+          const payload = msg.data || msg.message;
+          if ((msg.type === 'publish' || msg.type === 'pubsub') && msg.topic === this.options.room && payload) {
+            const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
             if (data.from && data.from !== this.options.peerId) {
               if (data.target && data.target !== this.options.peerId) {
                 return; // targeted to another peer

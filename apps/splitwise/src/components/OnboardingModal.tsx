@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Users, Check, ArrowRight, UserCheck, AlertCircle } from 'lucide-react';
+import { Plus, X, Users, Check, ArrowRight, UserCheck, AlertCircle, Loader2 } from 'lucide-react';
 import { SUPPORTED_CURRENCIES, SupportedCurrency, GroupMeta } from '../domain/schema.ts';
 import { getAvatarColor, getCurrencySymbol } from '../domain/ui-helpers.ts';
 
@@ -10,6 +10,8 @@ interface OnboardingModalProps {
   onSaveGroup: (group: GroupMeta) => void;
   onSelectUser: (userName: string) => void;
   onClose?: () => void;
+  isSharedLink?: boolean;
+  peersCount?: number;
 }
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({
@@ -18,9 +20,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   currentUserName,
   onSaveGroup,
   onSelectUser,
-  onClose
+  onClose,
+  isSharedLink = false,
+  peersCount = 0
 }) => {
-  const isCreation = !groupMeta || !groupMeta.members || groupMeta.members.length === 0;
+  const [manualCreateMode, setManualCreateMode] = useState(false);
+  const hasGroupData = Boolean(groupMeta && groupMeta.members && groupMeta.members.length > 0);
+  const isWaitingForSync = Boolean(isSharedLink && !hasGroupData && !manualCreateMode);
+  const isCreation = !hasGroupData;
 
   const [groupName, setGroupName] = useState(groupMeta?.name || 'Trip & Expenses');
   const [currency, setCurrency] = useState<SupportedCurrency>((groupMeta?.currency as SupportedCurrency) || 'INR');
@@ -142,7 +149,38 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
         {/* Soft decorative background bubble */}
         <div className="absolute -top-16 -right-16 w-36 h-36 bg-sky-200/40 dark:bg-sky-900/20 rounded-full blur-2xl pointer-events-none" />
 
-        {isCreation ? (
+        {isWaitingForSync ? (
+          /* Connecting / Syncing with existing group */
+          <div className="text-center py-4 px-1">
+            <div className="w-14 h-14 bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
+              <Loader2 className="w-7 h-7 animate-spin" />
+            </div>
+
+            <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Connecting to Group...</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
+              Syncing group members and expenses directly from active peers via P2P mesh...
+            </p>
+
+            <div className="mt-4 mb-4 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+              <span className={`w-2 h-2 rounded-full ${peersCount > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400 animate-ping'}`} />
+              <span>
+                {peersCount > 0
+                  ? `${peersCount} peer(s) connected • Syncing data...`
+                  : 'Discovering peers in mesh...'}
+              </span>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setManualCreateMode(true)}
+                className="text-xs text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 underline transition"
+              >
+                Or initialize group manually
+              </button>
+            </div>
+          </div>
+        ) : isCreation ? (
           /* Group Creation Form */
           <div>
             <div className="text-center mb-4">
@@ -282,7 +320,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
             <div className="text-center mb-5">
               <span className="inline-block px-3 py-1 bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 text-xs font-bold rounded-full mb-1.5">
-                {groupMeta.name}
+                {groupMeta?.name || 'Group'}
               </span>
               <h2 className="text-2xl font-black text-slate-900 dark:text-white">Who are you?</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -299,7 +337,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
             {!showAddNewMember ? (
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                {groupMeta.members.map(name => {
+                {(groupMeta?.members || []).map(name => {
                   const isLegacyYou = name.toLowerCase() === 'you';
                   const isSelected = !isLegacyYou && currentUserName?.toLowerCase() === name.toLowerCase();
                   const color = getAvatarColor(name);

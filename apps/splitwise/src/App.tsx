@@ -66,6 +66,12 @@ export const App: React.FC = () => {
 
   const groupMeta: GroupMeta | null = groupMetaList[0] || null;
 
+  // Detect whether the session was opened via an existing shared link (#workspaceId:passphrase)
+  const isSharedLink = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(window.location.hash && window.location.hash.includes(':'));
+  }, []);
+
   // 3. User Identity resolution from localStorage
   const workspaceId = kernel?.credentials.workspaceId || 'default';
 
@@ -397,6 +403,8 @@ export const App: React.FC = () => {
           onSaveGroup={handleSaveGroup}
           onSelectUser={handleSelectUser}
           onClose={currentUserName && currentUserName.toLowerCase() !== 'you' ? () => setIsOnboardingOpen(false) : undefined}
+          isSharedLink={isSharedLink}
+          peersCount={status?.peersCount || 0}
         />
 
         {/* Add / Edit Expense Form Modal */}
