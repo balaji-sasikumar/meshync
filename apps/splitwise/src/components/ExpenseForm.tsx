@@ -255,20 +255,23 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({
               {EXPENSE_CATEGORIES.map(cat => {
                 const info = CATEGORY_INFO[cat];
                 const isSelected = category === cat;
+                const shortName = cat === 'Entertainment' ? 'Events' : cat.split(' ')[0];
                 return (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setCategory(cat)}
-                    className={`flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg text-center transition-all border ${
+                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-center transition-all border ${
                       isSelected
-                        ? 'bg-sky-500 border-sky-500 text-white shadow-sm ring-1 ring-sky-300 dark:ring-sky-600 font-bold scale-[1.02]'
+                        ? 'bg-sky-500 border-sky-500 text-white shadow-sm ring-2 ring-sky-300 dark:ring-sky-600 font-bold scale-[1.02]'
                         : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <span className="text-sm leading-none shrink-0">{info.emoji}</span>
-                    <span className="text-[10px] font-bold truncate leading-tight">
-                      {cat.split(' ')[0]}
+                    <span className="text-lg leading-none mb-1 flex items-center justify-center">
+                      {info.emoji}
+                    </span>
+                    <span className="text-[10px] font-bold text-center leading-none tracking-tight">
+                      {shortName}
                     </span>
                   </button>
                 );
