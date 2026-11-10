@@ -1,4 +1,5 @@
-import type { Expense, NetBalance, SettlementTransaction, SettlementRecord } from './schema.ts';
+import type { Expense, NetBalance, SettlementTransaction, SettlementRecord } from './schema.js';
+import { isSettlementItem } from './schema.js';
 
 /**
  * Deterministically compute net balances per currency from the CRDT expense log
@@ -10,25 +11,38 @@ export function calculateNetBalances(
 ): Map<string, Map<string, number>> {
   const currencyBalances = new Map<string, Map<string, number>>();
 
-  // Process expenses
+  // 1. Process expenses
   for (const exp of expenses) {
-    if (!exp.amount || exp.amount <= 0 || !exp.participants || exp.participants.length === 0) {
-      continue;
-    }
+    if (!exp.amount || exp.amount <= 0) continue;
 
-    const currency = exp.currency || 'USD';
+    const currency = exp.currency || 'INR';
     if (!currencyBalances.has(currency)) {
       currencyBalances.set(currency, new Map());
     }
     const balances = currencyBalances.get(currency)!;
 
-    const payer = exp.payer.trim();
+    // If an item in expenses is a legacy settlement record:
+    if (isSettlementItem(exp)) {
+      const fromPerson = (exp.payer || '').trim();
+      const toPerson = (exp.participants?.[0] || '').trim();
+      if (fromPerson && toPerson) {
+        // Debtor paid creditor: debtor's debt is reduced (+), creditor's credit is reduced (-)
+        balances.set(fromPerson, (balances.get(fromPerson) || 0) + exp.amount);
+        balances.set(toPerson, (balances.get(toPerson) || 0) - exp.amount);
+      }
+      continue;
+    }
+
+    // Genuine bill / expense
+    if (!exp.participants || exp.participants.length === 0) continue;
+
+    const payer = exp.payer?.trim();
     if (!payer) continue;
 
-    // Credit payer
+    // Credit payer for the total amount paid
     balances.set(payer, (balances.get(payer) || 0) + exp.amount);
 
-    // Debit participants equally
+    // Debit each participant for their equal share
     const share = exp.amount / exp.participants.length;
     for (const p of exp.participants) {
       const participant = p.trim();
@@ -37,13 +51,11 @@ export function calculateNetBalances(
     }
   }
 
-  // Process offset settlements (transfers between peers)
+  // 2. Process dedicated settlement transfers
   for (const st of settlements) {
-    if (!st.amount || st.amount <= 0 || !st.from || !st.to) {
-      continue;
-    }
+    if (!st.amount || st.amount <= 0 || !st.from || !st.to) continue;
 
-    const currency = st.currency || 'USD';
+    const currency = st.currency || 'INR';
     if (!currencyBalances.has(currency)) {
       currencyBalances.set(currency, new Map());
     }
@@ -52,10 +64,8 @@ export function calculateNetBalances(
     const fromPerson = st.from.trim();
     const toPerson = st.to.trim();
 
-    // The payer of the settlement (debtor) reduces their debt (credits balance)
+    // The debtor paid the creditor
     balances.set(fromPerson, (balances.get(fromPerson) || 0) + st.amount);
-
-    // The receiver of the settlement (creditor) has been reimbursed (debits balance)
     balances.set(toPerson, (balances.get(toPerson) || 0) - st.amount);
   }
 

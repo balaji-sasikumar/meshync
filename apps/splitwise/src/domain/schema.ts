@@ -42,7 +42,7 @@ export interface SettlementTransaction {
   currency: string;
 }
 
-export const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD'] as const;
+export const SUPPORTED_CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'JPY', 'CAD'] as const;
 export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
 
 export const EXPENSE_CATEGORIES = [
@@ -55,3 +55,18 @@ export const EXPENSE_CATEGORIES = [
   'Shopping',
   'General'
 ] as const;
+
+/**
+ * Returns true if an item represents a debt settlement payment rather than an actual expense.
+ */
+export function isSettlementItem(expense: Partial<Expense>): boolean {
+  if (!expense) return false;
+  const desc = (expense.description || '').toLowerCase();
+  return (
+    desc.startsWith('settlement:') ||
+    desc.startsWith('settlement ') ||
+    desc.startsWith('settle ') ||
+    expense.note === 'Debt settlement transfer' ||
+    expense.category === 'Settlement'
+  );
+}

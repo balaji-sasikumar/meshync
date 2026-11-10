@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useMeshKernel, useCollection } from '@localfirst/mesh-sync';
 import type { Expense, SettlementTransaction, SettlementRecord, GroupMeta } from './domain/schema.ts';
+import { isSettlementItem } from './domain/schema.ts';
 import { computeAllSettlements } from './domain/debt-simplification.ts';
 import { Header } from './components/Header.tsx';
 import { HeroSummaryCard } from './components/HeroSummaryCard.tsx';
@@ -54,7 +55,7 @@ export const App: React.FC = () => {
     remove: removeExpense
   } = useCollection<Expense>(kernel, 'expenses');
 
-  // Dedicated settlements collection (does not inflate group expenditure)
+  // Dedicated settlements collection
   const {
     items: settlementRecords,
     add: addSettlementRecord,
@@ -73,64 +74,136 @@ export const App: React.FC = () => {
     const savedWorkspaceUser = localStorage.getItem(storageKey);
     const savedLastUser = localStorage.getItem('peersplit_last_user');
 
-    if (savedWorkspaceUser) {
-      setCurrentUserName(savedWorkspaceUser);
+    // Strictly disallow 'You' as a saved identity
+    const isValidName = (name: string | null) => Boolean(name && name.toLowerCase() !== 'you');
+
+    if (isValidName(savedWorkspaceUser)) {
+      setCurrentUserName(savedWorkspaceUser!);
       setIsOnboardingOpen(false);
-    } else if (savedLastUser && groupMeta?.members?.some(m => m.toLowerCase() === savedLastUser.toLowerCase())) {
-      // Auto-assign previous user name if they are in this group's member list
-      setCurrentUserName(savedLastUser);
-      localStorage.setItem(storageKey, savedLastUser);
+    } else if (isValidName(savedLastUser) && groupMeta?.members?.some(m => m.toLowerCase() === savedLastUser!.toLowerCase())) {
+      setCurrentUserName(savedLastUser!);
+      localStorage.setItem(storageKey, savedLastUser!);
       setIsOnboardingOpen(false);
     } else {
-      // First time opening: show onboarding only if user not yet resolved
       setIsOnboardingOpen(true);
     }
   }, [isReady, workspaceId, groupMeta?.members]);
 
-  // 4. Compute all unique participants
+  // 4. Auto-clean & migrate any legacy settlement items out of the expenses collection
+  useEffect(() => {
+    if (!isReady) return;
+    for (const exp of expenses) {
+      if (isSettlementItem(exp)) {
+        const fromPerson = (exp.payer || '').trim();
+        const toPerson = (exp.participants?.[0] || '').trim();
+        if (fromPerson && toPerson && exp.amount > 0) {
+          const alreadyLogged = settlementRecords.some(
+            s => s.from === fromPerson && s.to === toPerson && s.amount === exp.amount
+          );
+          if (!alreadyLogged) {
+            addSettlementRecord({
+              id: `settle_migrated_${exp.id}`,
+              from: fromPerson,
+              to: toPerson,
+              amount: exp.amount,
+              currency: exp.currency || 'INR',
+              timestamp: exp.timestamp || Date.now()
+            });
+          }
+        }
+        // Remove from expenses so it never inflates group expenditure
+        removeExpense(exp.id);
+      }
+    }
+  }, [isReady, expenses, settlementRecords]);
+
+  // 5. Genuine expenses list (strictly without any settlements)
+  const genuineExpenses = useMemo(() => {
+    return expenses.filter(e => !isSettlementItem(e));
+  }, [expenses]);
+
+  // 6. Compute all unique participants
   const knownParticipants = useMemo(() => {
     const set = new Set<string>();
     if (groupMeta?.members) {
-      groupMeta.members.forEach(m => set.add(m));
+      groupMeta.members.forEach(m => {
+        if (m.toLowerCase() !== 'you') set.add(m);
+      });
     }
-    for (const exp of expenses) {
-      if (exp.payer) set.add(exp.payer);
-      for (const p of exp.participants) set.add(p);
+    for (const exp of genuineExpenses) {
+      if (exp.payer && exp.payer.toLowerCase() !== 'you') set.add(exp.payer);
+      for (const p of exp.participants) {
+        if (p && p.toLowerCase() !== 'you') set.add(p);
+      }
     }
     return Array.from(set).sort();
-  }, [groupMeta, expenses]);
+  }, [groupMeta, genuineExpenses]);
 
-  // 5. Compute pure client-side deterministic debt settlements (with offset payments)
+  // 7. Compute pure client-side deterministic debt settlements (with offset payments)
   const { balancesByCurrency, settlementsByCurrency } = useMemo(() => {
-    return computeAllSettlements(expenses, settlementRecords);
-  }, [expenses, settlementRecords]);
+    return computeAllSettlements(genuineExpenses, settlementRecords);
+  }, [genuineExpenses, settlementRecords]);
 
   // Compute current user's net balance across the group's active currency
   const userNetBalance = useMemo(() => {
-    if (!currentUserName) return 0;
-    const groupCurrency = groupMeta?.currency || (expenses[0]?.currency) || 'INR';
+    if (!currentUserName || currentUserName.toLowerCase() === 'you') return 0;
+    const groupCurrency = groupMeta?.currency || (genuineExpenses[0]?.currency) || 'INR';
     const balances = balancesByCurrency.get(groupCurrency) || [];
     const userBalanceObj = balances.find(b => b.person.toLowerCase() === currentUserName.toLowerCase());
     return userBalanceObj ? userBalanceObj.balance : 0;
-  }, [balancesByCurrency, groupMeta, expenses, currentUserName]);
+  }, [balancesByCurrency, groupMeta, genuineExpenses, currentUserName]);
 
-  // 6. Action Handlers
+  // 8. Action Handlers
   const handleSaveGroup = (newGroup: GroupMeta) => {
     setGroupMeta({
       ...newGroup,
       id: 'current_group'
     });
-    if (!currentUserName && newGroup.members.length > 0) {
-      // Prompt selection for the newly created members
+    if (!currentUserName || currentUserName.toLowerCase() === 'you') {
+      // Keep prompt open to select real name
     } else {
       setIsOnboardingOpen(false);
     }
   };
 
   const handleSelectUser = (userName: string) => {
-    setCurrentUserName(userName);
-    localStorage.setItem(`peersplit_user_${workspaceId}`, userName);
-    localStorage.setItem('peersplit_last_user', userName);
+    if (!userName.trim() || userName.toLowerCase() === 'you') return;
+
+    const realName = userName.trim();
+    setCurrentUserName(realName);
+    localStorage.setItem(`peersplit_user_${workspaceId}`, realName);
+    localStorage.setItem('peersplit_last_user', realName);
+
+    // Auto-migrate: If the group currently has a legacy member called 'You', rename 'You' to this real name!
+    if (groupMeta && groupMeta.members.some(m => m.toLowerCase() === 'you')) {
+      const updatedMembers = groupMeta.members.map(m => m.toLowerCase() === 'you' ? realName : m);
+      setGroupMeta({
+        ...groupMeta,
+        members: Array.from(new Set(updatedMembers))
+      });
+
+      // Also migrate any existing expense records that were recorded under 'You'
+      for (const exp of expenses) {
+        let changed = false;
+        let newPayer = exp.payer;
+        if (exp.payer.toLowerCase() === 'you') {
+          newPayer = realName;
+          changed = true;
+        }
+        const newParticipants = exp.participants.map(p => p.toLowerCase() === 'you' ? realName : p);
+        if (exp.participants.some(p => p.toLowerCase() === 'you')) {
+          changed = true;
+        }
+        if (changed) {
+          addExpense({
+            ...exp,
+            payer: newPayer,
+            participants: Array.from(new Set(newParticipants))
+          });
+        }
+      }
+    }
+
     setIsOnboardingOpen(false);
   };
 
@@ -157,7 +230,7 @@ export const App: React.FC = () => {
     const backup = {
       workspaceId,
       groupMeta,
-      expenses,
+      expenses: genuineExpenses,
       settlements: settlementRecords
     };
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backup, null, 2));
@@ -187,7 +260,7 @@ export const App: React.FC = () => {
   const handleImportJson = (importedItems: any) => {
     if (Array.isArray(importedItems)) {
       for (const item of importedItems) {
-        if (item && item.amount && item.payer) {
+        if (item && item.amount && item.payer && !isSettlementItem(item)) {
           addExpense({
             ...item,
             id: item.id || `exp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
@@ -197,7 +270,9 @@ export const App: React.FC = () => {
     } else if (importedItems && typeof importedItems === 'object') {
       if (importedItems.groupMeta) setGroupMeta(importedItems.groupMeta);
       if (Array.isArray(importedItems.expenses)) {
-        importedItems.expenses.forEach((e: any) => addExpense(e));
+        importedItems.expenses
+          .filter((e: any) => !isSettlementItem(e))
+          .forEach((e: any) => addExpense(e));
       }
       if (Array.isArray(importedItems.settlements)) {
         importedItems.settlements.forEach((s: any) => addSettlementRecord(s));
@@ -256,7 +331,7 @@ export const App: React.FC = () => {
           />
 
           <HeroSummaryCard
-            expenses={expenses}
+            expenses={genuineExpenses}
             groupMeta={groupMeta}
             currentUserName={currentUserName}
             userNetBalance={userNetBalance}
@@ -269,7 +344,7 @@ export const App: React.FC = () => {
         <main className="flex-1 overflow-y-auto">
           {activeTab === 'expenses' ? (
             <ExpenseList
-              expenses={expenses}
+              expenses={genuineExpenses}
               onDeleteExpense={removeExpense}
               onOpenAddExpense={() => setIsExpenseFormOpen(true)}
               currentUserName={currentUserName}
@@ -292,7 +367,7 @@ export const App: React.FC = () => {
           activeTab={activeTab}
           onChangeTab={setActiveTab}
           onOpenAddExpense={() => setIsExpenseFormOpen(true)}
-          expenseCount={expenses.length}
+          expenseCount={genuineExpenses.length}
         />
 
         {/* Onboarding & "Who Are You?" Modal */}
@@ -302,10 +377,10 @@ export const App: React.FC = () => {
           currentUserName={currentUserName}
           onSaveGroup={handleSaveGroup}
           onSelectUser={handleSelectUser}
-          onClose={currentUserName ? () => setIsOnboardingOpen(false) : undefined}
+          onClose={currentUserName && currentUserName.toLowerCase() !== 'you' ? () => setIsOnboardingOpen(false) : undefined}
         />
 
-        {/* Add Expense Form Modal (No scroll categories, auto-synced INR currency, member checkboxes) */}
+        {/* Add Expense Form Modal */}
         <ExpenseForm
           isOpen={isExpenseFormOpen}
           onClose={() => setIsExpenseFormOpen(false)}
