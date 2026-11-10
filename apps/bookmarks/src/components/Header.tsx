@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Bookmark as BookmarkIcon,
+  Bookmark,
   Radio,
   Share2,
   Check,
@@ -46,8 +46,8 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="px-4 pt-3.5 pb-2.5 flex items-center justify-between">
       {/* Brand Icon & Space Title */}
       <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-xl bg-orange-500/10 dark:bg-orange-500/15 text-orange-500 flex items-center justify-center">
-          <BookmarkIcon className="w-4 h-4 fill-current" />
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-sky-500/25">
+          <Bookmark className="w-4 h-4 fill-white/20" />
         </div>
         <div>
           <h1 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">

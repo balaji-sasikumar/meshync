@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Globe,
   Pin,
@@ -8,10 +8,15 @@ import {
   MoreVertical,
   Edit2,
   Archive,
-  Trash2
-} from 'lucide-react';
-import type { Bookmark } from '../domain/schema.ts';
-import { getDomain, getFaviconUrl, formatFeedDate, getAvatarColor } from '../domain/schema.ts';
+  Trash2,
+} from "lucide-react";
+import type { Bookmark } from "../domain/schema.ts";
+import {
+  getDomain,
+  getFaviconUrl,
+  formatFeedDate,
+  getAvatarColor,
+} from "../domain/schema.ts";
 
 interface BookmarkItemProps {
   bookmark: Bookmark;
@@ -30,16 +35,18 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
   onToggleArchive,
   onDelete,
   onEdit,
-  onSelectTag
+  onSelectTag,
 }) => {
   const [imgError, setImgError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const domain = getDomain(bookmark.url);
-  const authorName = bookmark.author || 'Anonymous';
+  const authorName = bookmark.author || "Anonymous";
   const authorColor = getAvatarColor(authorName);
-  const isSelf = currentUserName && authorName.toLowerCase() === currentUserName.toLowerCase();
+  const isSelf =
+    currentUserName &&
+    authorName.toLowerCase() === currentUserName.toLowerCase();
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -78,7 +85,9 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
           {/* Author Name */}
           <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
             <span>By {authorName}</span>
-            {isSelf && <span className="text-sky-500 font-semibold">(You)</span>}
+            {isSelf && (
+              <span className="text-sky-500 font-semibold">(You)</span>
+            )}
           </span>
         </div>
 
@@ -97,15 +106,15 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
       </div>
 
       {/* Main Title Row: Clean, Bold, Wraps naturally without cutting off */}
-      <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug mb-1.5 break-words">
+      <h2 className="text-base font-bold text-slate-900 dark:text-white leading-snug mb-1.5 hover:text-sky-500 transition-colors">
         <a
           href={bookmark.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors inline"
+          className="inline-flex items-baseline gap-1"
         >
-          {bookmark.title}
-          <ExternalLink className="inline-block w-3 h-3 ml-1.5 opacity-0 group-hover:opacity-60 transition -translate-y-0.5" />
+          <span>{bookmark.title}</span>
+          <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-60 transition shrink-0 translate-y-0.5" />
         </a>
       </h2>
 
@@ -121,7 +130,7 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
         {/* Tags */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {bookmark.tags && bookmark.tags.length > 0 ? (
-            bookmark.tags.map(tag => (
+            bookmark.tags.map((tag) => (
               <button
                 key={tag}
                 type="button"
@@ -144,20 +153,26 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
             title="Copy URL"
             className="p-1.5 rounded-lg hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800 transition"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? (
+              <Check className="w-3.5 h-3.5 text-emerald-500" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
           </button>
 
           <button
             type="button"
             onClick={() => onTogglePin(bookmark.id, bookmark.pinned)}
-            title={bookmark.pinned ? 'Unpin' : 'Pin to top'}
+            title={bookmark.pinned ? "Unpin" : "Pin to top"}
             className={`p-1.5 rounded-lg transition ${
               bookmark.pinned
-                ? 'text-amber-500 hover:bg-amber-500/10'
-                : 'hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800'
+                ? "text-amber-500 hover:bg-amber-500/10"
+                : "hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800"
             }`}
           >
-            <Pin className={`w-3.5 h-3.5 ${bookmark.pinned ? 'fill-current' : ''}`} />
+            <Pin
+              className={`w-3.5 h-3.5 ${bookmark.pinned ? "fill-current" : ""}`}
+            />
           </button>
 
           {/* 3-Dot Menu */}
@@ -197,7 +212,7 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
                     className="w-full px-3 py-1.5 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
                   >
                     <Archive className="w-3.5 h-3.5" />
-                    <span>{bookmark.archived ? 'Unarchive' : 'Archive'}</span>
+                    <span>{bookmark.archived ? "Unarchive" : "Archive"}</span>
                   </button>
 
                   <div className="my-1 border-t border-slate-100 dark:border-slate-700" />

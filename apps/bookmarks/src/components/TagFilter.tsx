@@ -61,7 +61,7 @@ export const TagFilter: React.FC<Props> = ({
           }}
           className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition ${
             selectedTag === null && !filterPinned && !showArchived
-              ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+              ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/20'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/60'
           }`}
         >
@@ -77,7 +77,7 @@ export const TagFilter: React.FC<Props> = ({
               onClick={() => onSelectTag(isSelected ? null : t)}
               className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1 ${
                 isSelected
-                  ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+                  ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/20'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/60'
               }`}
             >
@@ -93,7 +93,7 @@ export const TagFilter: React.FC<Props> = ({
             onClick={onToggleFilterPinned}
             className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1 ${
               filterPinned
-                ? 'bg-amber-500 text-white shadow-sm'
+                ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/20'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/60'
             }`}
           >
@@ -107,7 +107,7 @@ export const TagFilter: React.FC<Props> = ({
           onClick={onToggleShowArchived}
           className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1 ml-auto shrink-0 ${
             showArchived
-              ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+              ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/20'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/60'
           }`}
         >
