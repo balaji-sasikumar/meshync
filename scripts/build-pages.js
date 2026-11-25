@@ -32,155 +32,213 @@ if (fs.existsSync(bookmarksDist)) {
   console.warn('⚠ Bookmarks dist directory not found. Please run npm run build first.');
 }
 
-// Generate sleek landing portal HTML
+// Generate minimalist modern landing portal HTML
 const landingHtml = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Zero-Server Local-First Mesh Suite</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>MeshSync</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&display=swap" rel="stylesheet">
     <style>
-      body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background-color: #070a12; color: #f1f5f9; }
-      .font-mono { font-family: 'JetBrains Mono', monospace; }
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      :root {
+        --bg: #0a0a0a;
+        --surface: #111111;
+        --border: #1e1e1e;
+        --border-hover: #2a2a2a;
+        --text-primary: #f0f0f0;
+        --text-secondary: #6b6b6b;
+        --text-muted: #333333;
+        --green: #22c55e;
+        --blue: #3b82f6;
+      }
+      html, body { height: 100%; }
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: var(--bg);
+        color: var(--text-primary);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      a { text-decoration: none; color: inherit; }
+
+      .wrap {
+        max-width: 560px;
+        margin: 0 auto;
+        padding: 0 28px;
+        width: 100%;
+      }
+
+      /* Header */
+      header { padding: 44px 28px 0; max-width: 560px; margin: 0 auto; width: 100%; }
+      .logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--text-primary);
+      }
+      .logo-dot {
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: var(--green);
+        flex-shrink: 0;
+        animation: glow 2.4s ease-in-out infinite;
+      }
+      @keyframes glow {
+        0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+        50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(34,197,94,0.1); }
+      }
+
+      /* Hero */
+      .hero { padding: 72px 28px 56px; max-width: 560px; margin: 0 auto; width: 100%; }
+      .hero h1 {
+        font-size: clamp(30px, 6vw, 44px);
+        font-weight: 700;
+        line-height: 1.1;
+        letter-spacing: -0.04em;
+        color: var(--text-primary);
+        margin-bottom: 18px;
+      }
+      .hero h1 em { font-style: normal; color: var(--text-secondary); }
+      .hero p {
+        font-size: 15px;
+        line-height: 1.7;
+        color: var(--text-secondary);
+        font-weight: 400;
+        max-width: 420px;
+      }
+
+      /* Cards */
+      .cards { max-width: 560px; margin: 0 auto; padding: 0 28px; display: flex; flex-direction: column; gap: 10px; }
+      .card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 20px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        transition: border-color 0.12s, background 0.12s;
+        position: relative;
+        overflow: hidden;
+      }
+      .card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      .card.green::before { background: radial-gradient(ellipse at 0% 50%, rgba(34,197,94,0.04) 0%, transparent 70%); }
+      .card.blue::before  { background: radial-gradient(ellipse at 0% 50%, rgba(59,130,246,0.04) 0%, transparent 70%); }
+      .card:hover { border-color: var(--border-hover); background: #141414; }
+      .card:hover::before { opacity: 1; }
+
+      .card-inner { display: flex; align-items: center; gap: 15px; position: relative; }
+      .icon {
+        width: 38px; height: 38px;
+        border-radius: 9px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 17px;
+        flex-shrink: 0;
+      }
+      .icon.green { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.12); }
+      .icon.blue  { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.12); }
+
+      .card-name { font-size: 14px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; margin-bottom: 2px; }
+      .card-desc { font-size: 12.5px; color: var(--text-secondary); font-weight: 400; line-height: 1.4; }
+
+      .arrow {
+        font-size: 16px;
+        color: var(--text-muted);
+        flex-shrink: 0;
+        position: relative;
+        transition: color 0.12s, transform 0.12s;
+      }
+      .card:hover .arrow { color: var(--text-secondary); transform: translateX(3px); }
+
+      /* Footer */
+      footer {
+        margin-top: auto;
+        padding: 44px 28px;
+        max-width: 560px;
+        margin-left: auto;
+        margin-right: auto;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .footer-text { font-size: 12px; color: var(--text-muted); letter-spacing: 0.01em; }
+      .footer-pill {
+        font-size: 11px;
+        color: var(--text-muted);
+        border: 1px solid #1a1a1a;
+        border-radius: 20px;
+        padding: 4px 12px;
+        letter-spacing: 0.03em;
+      }
+
+      @media (max-width: 480px) {
+        .hero { padding: 52px 24px 44px; }
+        header { padding-top: 32px; }
+        .cards { padding: 0 24px; }
+        footer { padding: 36px 24px; }
+        .wrap { padding: 0 24px; }
+      }
     </style>
   </head>
-  <body class="min-h-screen flex flex-col justify-between selection:bg-emerald-500 selection:text-black">
-    <div class="max-w-5xl mx-auto px-4 py-16 flex-1 w-full space-y-12">
-      <!-- Header -->
-      <div class="text-center space-y-4 max-w-2xl mx-auto">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono font-semibold">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          Zero-Server • 100% Client-Side
-        </div>
-        <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-          Local-First P2P Mesh Suite
-        </h1>
-        <p class="text-slate-400 text-sm sm:text-base leading-relaxed">
-          Decoupled architecture powered by the <code class="text-emerald-400 font-mono">@localfirst/mesh-sync</code> kernel.
-          Runs entirely in your browser using Web Crypto, Yjs CRDTs, WebRTC DataChannels, and decentralized IPFS snapshots.
-        </p>
+  <body>
+    <header>
+      <div class="logo">
+        <span class="logo-dot"></span>
+        MeshSync
+      </div>
+    </header>
+
+    <main>
+      <div class="hero">
+        <h1>Your data,<br><em>no servers.</em></h1>
+        <p>Two apps that sync directly between peers — end-to-end encrypted, offline-first, no sign-up required.</p>
       </div>
 
-      <!-- App Launch Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- App 1: PeerSplit -->
-        <div class="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-2xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 shadow-xl group">
-          <div class="space-y-4">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 font-bold text-2xl shadow-lg shadow-emerald-500/20">
-              💳
-            </div>
+      <div class="cards">
+        <a href="./splitwise/" class="card green">
+          <div class="card-inner">
+            <div class="icon green">💳</div>
             <div>
-              <div class="flex items-center gap-2">
-                <h2 class="text-xl font-bold text-white group-hover:text-emerald-400 transition-colors">PeerSplit</h2>
-                <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Expense Mesh
-                </span>
-              </div>
-              <p class="text-xs text-slate-400 mt-2 leading-relaxed">
-                P2P Splitwise clone with pure client-side deterministic debt simplification. Computes minimal cash-flow settlements from the CRDT event log without a coordinator.
-              </p>
-            </div>
-
-            <div class="space-y-1.5 text-xs text-slate-500 font-mono">
-              <div class="flex items-center gap-2">
-                <span class="text-emerald-400">✓</span> Cash-Flow Minimization Tree
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-emerald-400">✓</span> Multi-Currency & Equal Splits
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-emerald-400">✓</span> Visual Payoff Graph with 1-Click Settle
-              </div>
+              <div class="card-name">PeerSplit</div>
+              <div class="card-desc">Split expenses and settle debts with friends</div>
             </div>
           </div>
+          <span class="arrow">→</span>
+        </a>
 
-          <div class="pt-6">
-            <a
-              href="./splitwise/"
-              class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all"
-            >
-              <span>Launch PeerSplit</span>
-              <span>→</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- App 2: MeshBookmarks -->
-        <div class="bg-slate-900/80 border border-slate-800 hover:border-indigo-500/40 rounded-2xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 shadow-xl group">
-          <div class="space-y-4">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-indigo-500/20">
-              🔖
-            </div>
+        <a href="./bookmarks/" class="card blue">
+          <div class="card-inner">
+            <div class="icon blue">🔖</div>
             <div>
-              <div class="flex items-center gap-2">
-                <h2 class="text-xl font-bold text-white group-hover:text-indigo-400 transition-colors">MeshBookmarks</h2>
-                <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  Shared Hub
-                </span>
-              </div>
-              <p class="text-xs text-slate-400 mt-2 leading-relaxed">
-                Collaborative bookmark repository with instant peer synchronization. Features multi-tag filtering, real-time search, pinned bookmarks, and sovereign offline storage.
-              </p>
-            </div>
-
-            <div class="space-y-1.5 text-xs text-slate-500 font-mono">
-              <div class="flex items-center gap-2">
-                <span class="text-indigo-400">✓</span> Multi-Tag Picker & Live Filter
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-indigo-400">✓</span> Pinning & Archive Management
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-indigo-400">✓</span> Favicon Resolution & Instant Launch
-              </div>
+              <div class="card-name">MeshBookmarks</div>
+              <div class="card-desc">Share and sync bookmarks across your devices</div>
             </div>
           </div>
-
-          <div class="pt-6">
-            <a
-              href="./bookmarks/"
-              class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-sm shadow-lg shadow-indigo-500/20 transition-all"
-            >
-              <span>Launch MeshBookmarks</span>
-              <span>→</span>
-            </a>
-          </div>
-        </div>
+          <span class="arrow">→</span>
+        </a>
       </div>
+    </main>
 
-      <!-- Architectural Pillars -->
-      <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-4">
-        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 font-mono">
-          Headless Sync Kernel Specifications
-        </h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-          <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">
-            <strong class="text-emerald-400 block mb-1">E2E Web Crypto</strong>
-            <p class="text-slate-400 text-[11px]">PBKDF2 key derivation from URL hash fragments + AES-GCM 256-bit with fresh IV per transmission.</p>
-          </div>
-          <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">
-            <strong class="text-cyan-400 block mb-1">IndexedDB Durability</strong>
-            <p class="text-slate-400 text-[11px]">Zero-latency instant boot, append-only offline delta buffering, and automated compaction.</p>
-          </div>
-          <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">
-            <strong class="text-indigo-400 block mb-1">WebRTC DataChannels</strong>
-            <p class="text-slate-400 text-[11px]">Direct peer-to-peer binary mesh transport with symmetric vector-clock reconciliation.</p>
-          </div>
-          <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800">
-            <strong class="text-amber-400 block mb-1">IPFS Cold Relay</strong>
-            <p class="text-slate-400 text-[11px]">Debounced binary snapshots with CIDv1 (raw/sha2-256) identifiers for asynchronous rehydration.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="border-t border-slate-900 py-6 text-center text-xs text-slate-600 font-mono">
-      Local-First Monorepo Suite • Zero Servers • 100% Client-Side Sovereign Data
+    <footer>
+      <span class="footer-text">P2P · Encrypted · Open Source</span>
+      <span class="footer-pill">Zero Servers</span>
     </footer>
   </body>
 </html>
