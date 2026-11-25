@@ -11,8 +11,6 @@ interface Props {
   onSearchChange: (val: string) => void;
   showArchived: boolean;
   onToggleShowArchived: () => void;
-  totalCount: number;
-  filteredCount?: number;
   pinnedCount: number;
 }
 
@@ -26,7 +24,6 @@ export const TagFilter: React.FC<Props> = ({
   onSearchChange,
   showArchived,
   onToggleShowArchived,
-  totalCount,
   pinnedCount
 }) => {
   return (
@@ -51,7 +48,7 @@ export const TagFilter: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Substack-style Horizontal Tag Pills Bar */}
+      {/* Horizontal Tag Pills Bar */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 text-xs">
         {/* All Links Pill */}
         <button
@@ -98,7 +95,7 @@ export const TagFilter: React.FC<Props> = ({
             }`}
           >
             <Pin className="w-3 h-3" />
-            <span>Pinned ({pinnedCount})</span>
+            <span>Pinned</span>
           </button>
         )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Check, Bookmark as BookmarkIcon, Tag, Globe, User } from 'lucide-react';
+import { X, Check, Globe } from 'lucide-react';
 import type { Bookmark } from '../domain/schema.ts';
 import { PRESET_TAGS, getDomain, getAvatarColor } from '../domain/schema.ts';
 
@@ -104,8 +104,14 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
   const userColor = getAvatarColor(currentUserName || 'Author');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 relative border border-slate-100 dark:border-slate-800 max-h-[92vh] overflow-y-auto">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 relative border border-slate-100 dark:border-slate-800 max-h-[92vh] overflow-y-auto"
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
           <div>
@@ -113,7 +119,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
               {editingBookmark ? 'Edit Link' : 'Save New Link'}
             </h2>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Publish encrypted link to your P2P workspace
+              Save a link for everyone in this space
             </p>
           </div>
           <button
@@ -142,7 +148,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
                 onChange={e => setUrl(e.target.value)}
                 onBlur={handleUrlBlur}
                 placeholder="https://github.com/..."
-                className="w-full pl-9 pr-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition dark:text-white font-mono"
+                className="w-full pl-9 pr-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition dark:text-white font-mono"
               />
             </div>
           </div>
@@ -158,7 +164,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="e.g. Local-First Software Manifesto"
-              className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition dark:text-white"
+              className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition dark:text-white"
             />
           </div>
 
@@ -172,7 +178,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Key insights, context, or summary..."
-              className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition dark:text-white resize-none"
+              className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition dark:text-white resize-none"
             />
           </div>
 
@@ -195,8 +201,8 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
                     onClick={() => handleToggleTag(tag)}
                     className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition border ${
                       isSelected
-                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750'
+                        ? 'bg-sky-500 border-sky-500 text-white shadow-sm'
+                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                     }`}
                   >
                     #{tag}
@@ -218,13 +224,13 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
                   }
                 }}
                 placeholder="New tag..."
-                className="flex-1 px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                className="flex-1 px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white"
               />
               <button
                 type="button"
                 onClick={() => handleAddCustomTag()}
                 disabled={!newTagInput.trim()}
-                className="px-3.5 py-1.5 bg-slate-800 dark:bg-slate-700 text-white rounded-xl text-xs font-bold hover:bg-slate-900 disabled:opacity-40 transition"
+                className="px-3.5 py-1.5 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 rounded-xl text-xs font-bold transition"
               >
                 + Tag
               </button>
@@ -249,7 +255,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
                 type="checkbox"
                 checked={pinned}
                 onChange={e => setPinned(e.target.checked)}
-                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-600 cursor-pointer"
+                className="w-4 h-4 rounded text-sky-500 focus:ring-sky-500 border-slate-300 dark:border-slate-600 cursor-pointer"
               />
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pin to top</span>
             </label>
@@ -258,7 +264,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
           <button
             type="submit"
             disabled={!url.trim() || !title.trim()}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-extrabold rounded-xl shadow-lg shadow-indigo-600/25 transition flex items-center justify-center gap-2 disabled:opacity-50 mt-1"
+            className="w-full py-2.5 bg-sky-500 hover:bg-sky-600 active:scale-[0.98] text-white font-extrabold rounded-xl shadow-lg shadow-sky-500/25 transition flex items-center justify-center gap-2 disabled:opacity-50 mt-1"
           >
             <Check className="w-4 h-4" />
             <span>{editingBookmark ? 'Update Link' : 'Save Link'}</span>

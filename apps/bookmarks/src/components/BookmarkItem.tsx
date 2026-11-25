@@ -15,7 +15,6 @@ import {
   getDomain,
   getFaviconUrl,
   formatFeedDate,
-  getAvatarColor,
 } from "../domain/schema.ts";
 
 interface BookmarkItemProps {
@@ -40,10 +39,10 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
   const [imgError, setImgError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const domain = getDomain(bookmark.url);
   const authorName = bookmark.author || "Anonymous";
-  const authorColor = getAvatarColor(authorName);
   const isSelf =
     currentUserName &&
     authorName.toLowerCase() === currentUserName.toLowerCase();
@@ -57,7 +56,7 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
 
   return (
     <article className="border-b border-slate-200/80 dark:border-slate-800/80 py-4 px-2 hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors relative group">
-      {/* Top Meta Row: Favicon + Domain / Author + Date + Pin badge */}
+      {/* Top Meta Row: Favicon + Domain / Author + Date */}
       <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
         <div className="flex items-center gap-2 min-w-0 pr-2">
           {/* Favicon Icon */}
@@ -106,15 +105,15 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
       </div>
 
       {/* Main Title Row: Clean, Bold, Wraps naturally without cutting off */}
-      <h2 className="text-base font-bold text-slate-900 dark:text-white leading-snug mb-1.5 hover:text-sky-500 transition-colors">
+      <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug mb-1.5 break-words">
         <a
           href={bookmark.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-baseline gap-1"
+          className="hover:text-sky-500 dark:hover:text-sky-400 transition-colors inline"
         >
-          <span>{bookmark.title}</span>
-          <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-60 transition shrink-0 translate-y-0.5" />
+          {bookmark.title}
+          <ExternalLink className="inline-block w-3 h-3 ml-1.5 opacity-0 group-hover:opacity-60 transition -translate-y-0.5" />
         </a>
       </h2>
 
@@ -127,26 +126,22 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
 
       {/* Bottom Row: Tag Pills + Action Icons */}
       <div className="flex items-center justify-between gap-2 mt-2 pt-1">
-        {/* Tags */}
+        {/* Tags (hide empty placeholder) */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {bookmark.tags && bookmark.tags.length > 0 ? (
-            bookmark.tags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => onSelectTag(tag)}
-                className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-sky-500 hover:text-white transition"
-              >
-                #{tag}
-              </button>
-            ))
-          ) : (
-            <span className="text-[11px] text-slate-400 italic">No tags</span>
-          )}
+          {bookmark.tags?.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => onSelectTag(tag)}
+              className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-sky-500 hover:text-white transition"
+            >
+              #{tag}
+            </button>
+          ))}
         </div>
 
         {/* Action Buttons: Copy, Pin, 3-Dot Menu */}
-        <div className="flex items-center gap-1 text-slate-400">
+        <div className="flex items-center gap-1 text-slate-400 shrink-0">
           <button
             type="button"
             onClick={handleCopy}
@@ -179,7 +174,10 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
           <div className="relative">
             <button
               type="button"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              onClick={() => {
+                setConfirmDelete(false);
+                setIsMenuOpen(!isMenuOpen);
+              }}
               title="More options"
               className="p-1.5 rounded-lg hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800 transition"
             >
@@ -190,23 +188,28 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
               <>
                 <div
                   className="fixed inset-0 z-30"
-                  onClick={() => setIsMenuOpen(false)}
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setConfirmDelete(false);
+                  }}
                 />
                 <div className="absolute right-0 bottom-full mb-1 z-40 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 text-xs">
                   <button
                     onClick={() => {
                       setIsMenuOpen(false);
+                      setConfirmDelete(false);
                       onEdit(bookmark);
                     }}
                     className="w-full px-3 py-1.5 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
                   >
-                    <Edit2 className="w-3.5 h-3.5" />
+                    <Edit2 className="w-3.5 h-3.5 text-sky-500" />
                     <span>Edit</span>
                   </button>
 
                   <button
                     onClick={() => {
                       setIsMenuOpen(false);
+                      setConfirmDelete(false);
                       onToggleArchive(bookmark.id, bookmark.archived);
                     }}
                     className="w-full px-3 py-1.5 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
@@ -217,18 +220,34 @@ export const BookmarkItem: React.FC<BookmarkItemProps> = ({
 
                   <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
 
-                  <button
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      if (confirm(`Delete bookmark "${bookmark.title}"?`)) {
-                        onDelete(bookmark.id);
-                      }
-                    }}
-                    className="w-full px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete</span>
-                  </button>
+                  {confirmDelete ? (
+                    <div className="px-2 py-1 flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          setConfirmDelete(false);
+                          onDelete(bookmark.id);
+                        }}
+                        className="flex-1 py-1 px-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-[11px] font-bold transition"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(false)}
+                        className="py-1 px-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-semibold transition"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(true)}
+                      className="w-full px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
+                  )}
                 </div>
               </>
             )}
