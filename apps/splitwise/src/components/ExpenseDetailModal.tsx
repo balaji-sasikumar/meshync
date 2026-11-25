@@ -1,11 +1,10 @@
-import React from 'react';
-import { X, Calendar, User, Users, Edit2, Trash2, Receipt, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, Edit2, Trash2 } from 'lucide-react';
 import type { Expense, GroupMeta } from '../domain/schema.ts';
 import {
   CATEGORY_INFO,
   getAvatarColor,
-  getCurrencySymbol,
-  formatTimeAgo
+  getCurrencySymbol
 } from '../domain/ui-helpers.ts';
 
 interface ExpenseDetailModalProps {
@@ -24,9 +23,14 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   onClose,
   onEdit,
   onDelete,
-  currentUserName,
-  groupMeta
+  currentUserName
 }) => {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    setConfirmDelete(false);
+  }, [isOpen, expense?.id]);
+
   if (!isOpen || !expense) return null;
 
   const catInfo = CATEGORY_INFO[expense.category] || CATEGORY_INFO['General'];
@@ -201,29 +205,48 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
         {/* Action Buttons: Edit & Delete */}
         <div className="flex gap-2">
-          <button
-            onClick={() => {
-              onClose();
-              onEdit(expense);
-            }}
-            className="flex-1 py-2.5 px-4 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-            <span>Edit Bill</span>
-          </button>
+          {confirmDelete ? (
+            <>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-2.5 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmDelete(false);
+                  onClose();
+                  onDelete(expense.id);
+                }}
+                className="flex-1 py-2.5 px-4 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Confirm Delete</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => {
+                  onClose();
+                  onEdit(expense);
+                }}
+                className="flex-1 py-2.5 px-4 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>Edit Bill</span>
+              </button>
 
-          <button
-            onClick={() => {
-              if (confirm(`Delete "${expense.description}"?`)) {
-                onClose();
-                onDelete(expense.id);
-              }
-            }}
-            className="py-2.5 px-4 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-900/50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Delete</span>
-          </button>
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="py-2.5 px-4 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-900/50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

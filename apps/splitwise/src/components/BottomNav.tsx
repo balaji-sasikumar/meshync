@@ -5,14 +5,12 @@ interface BottomNavProps {
   activeTab: 'expenses' | 'settlements';
   onChangeTab: (tab: 'expenses' | 'settlements') => void;
   onOpenAddExpense: () => void;
-  expenseCount: number;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onChangeTab,
   onOpenAddExpense,
-  expenseCount
 }) => {
   return (
     <div className="fixed bottom-0 inset-x-0 sm:max-w-md sm:mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 px-6 py-2 z-40 flex items-center justify-around shadow-lg">
@@ -26,7 +24,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         }`}
       >
         <Receipt className="w-5 h-5" />
-        <span className="text-[11px]">Bills ({expenseCount})</span>
+        <span className="text-[11px]">Bills</span>
       </button>
 
       {/* Center Floating Plus Button */}

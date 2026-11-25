@@ -303,20 +303,13 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleOpenNewGroup = () => {
-    if (confirm('Create a brand new P2P expense group with a new encrypted link?')) {
-      window.location.hash = '';
-      window.location.reload();
-    }
-  };
-
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="bg-rose-950/60 border border-rose-800 rounded-3xl p-6 max-w-sm text-center text-white">
-          <ShieldAlert className="w-12 h-12 text-rose-400 mx-auto mb-3" />
-          <h2 className="text-base font-bold text-rose-200">Mesh Sync Initialization Error</h2>
-          <p className="text-xs text-rose-300/80 mt-1 font-mono">{error.message}</p>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 rounded-3xl p-6 max-w-sm text-center text-slate-900 dark:text-white shadow-lg">
+          <ShieldAlert className="w-12 h-12 text-rose-500 dark:text-rose-400 mx-auto mb-3" />
+          <h2 className="text-base font-bold text-rose-700 dark:text-rose-200">Mesh Sync Initialization Error</h2>
+          <p className="text-xs text-rose-600/80 dark:text-rose-300/80 mt-1 font-mono">{error.message}</p>
         </div>
       </div>
     );
@@ -324,10 +317,9 @@ export const App: React.FC = () => {
 
   if (!isReady || !status) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4 text-slate-900 dark:text-white">
         <Loader2 className="w-10 h-10 text-sky-400 animate-spin mb-3" />
-        <h2 className="text-sm font-semibold text-slate-200">Connecting to P2P Mesh...</h2>
-        <p className="text-xs text-slate-400 mt-1">Zero-Server Local-First Engine</p>
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Connecting to P2P Mesh...</h2>
       </div>
     );
   }
@@ -339,8 +331,8 @@ export const App: React.FC = () => {
         {/* Floating Minimal Sync Toast */}
         <SyncToast status={status} />
 
-        {/* STICKY TOP CONTAINER: Greeting Header + Hero Spend Card remain fixed on scroll */}
-        <div className="sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md pb-1.5 border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm transition-colors duration-200">
+        {/* STICKY TOP BAR: Only Header stays fixed on scroll */}
+        <div className="sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-800/50 transition-colors duration-200">
           <Header
             kernel={kernel}
             status={status}
@@ -350,21 +342,17 @@ export const App: React.FC = () => {
             onToggleTheme={toggleTheme}
             onOpenMeshModal={() => setIsMeshModalOpen(true)}
             onOpenSwitchUser={() => setIsOnboardingOpen(true)}
-            onOpenNewGroup={handleOpenNewGroup}
-          />
-
-          <HeroSummaryCard
-            expenses={genuineExpenses}
-            groupMeta={groupMeta}
-            currentUserName={currentUserName}
-            userNetBalance={userNetBalance}
-            onOpenAddExpense={handleOpenAddExpense}
-            onViewPayoffs={() => setActiveTab('settlements')}
           />
         </div>
 
-        {/* SCROLLABLE MAIN CONTENT (Only expenses & settlements scroll) */}
+        {/* SCROLLABLE MAIN CONTENT (Hero Summary + expenses/settlements scroll smoothly) */}
         <main className="flex-1 overflow-y-auto">
+          <HeroSummaryCard
+            expenses={genuineExpenses}
+            groupMeta={groupMeta}
+            userNetBalance={userNetBalance}
+          />
+
           {activeTab === 'expenses' ? (
             <ExpenseList
               expenses={genuineExpenses}
@@ -392,7 +380,6 @@ export const App: React.FC = () => {
           activeTab={activeTab}
           onChangeTab={setActiveTab}
           onOpenAddExpense={handleOpenAddExpense}
-          expenseCount={genuineExpenses.length}
         />
 
         {/* Onboarding & "Who Are You?" Modal */}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowRight, CheckCircle2, Check, ArrowRightLeft, Clock, Trash2 } from 'lucide-react';
 import type { NetBalance, SettlementTransaction, SettlementRecord, GroupMeta } from '../domain/schema.ts';
 import { getAvatarColor, getCurrencySymbol, formatTimeAgo } from '../domain/ui-helpers.ts';
@@ -19,9 +19,9 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
   settlementHistory = [],
   onSettleUp,
   onDeleteSettlement,
-  groupMeta,
   currentUserName
 }) => {
+  const [confirmUndoId, setConfirmUndoId] = useState<string | null>(null);
   const currencies = Array.from(balancesByCurrency.keys());
 
   if (currencies.length === 0) {
@@ -49,18 +49,13 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
 
         return (
           <div key={currency} className="space-y-4">
-            {/* 1. Ultra-Modern Member Balances Pillar Grid (Inspired by Reference UX Slide 3) */}
+            {/* 1. Member Balances */}
             <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Member Balances ({currency})
-                </h4>
-                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full">
-                  Zero-Sum Verified
-                </span>
-              </div>
+              <h4 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">
+                Member Balances ({currency})
+              </h4>
 
-              {/* Avatar Balance Pins */}
+              {/* Avatar Balance Grid */}
               <div className="flex items-end justify-around pt-2 pb-1 gap-2 overflow-x-auto">
                 {balances.map(b => {
                   const color = getAvatarColor(b.person);
@@ -69,42 +64,24 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
                   const isCurrent = b.person.toLowerCase() === currentUserName.toLowerCase();
 
                   return (
-                    <div
-                      key={b.person}
-                      className="flex flex-col items-center flex-1 min-w-[62px]"
-                    >
+                    <div key={b.person} className="flex flex-col items-center flex-1 min-w-[62px]">
                       {/* Avatar */}
-                      <div className="relative mb-1.5">
-                        <div
-                          className={`w-11 h-11 rounded-full flex items-center justify-center text-xs font-black shadow-sm ring-2 ${
-                            isCurrent ? 'ring-sky-400 dark:ring-sky-500' : 'ring-transparent'
-                          } ${color.bg} ${color.text}`}
-                        >
-                          {b.person.substring(0, 2).toUpperCase()}
-                        </div>
+                      <div
+                        className={`w-11 h-11 rounded-full flex items-center justify-center text-xs font-black shadow-sm ring-2 mb-2 ${
+                          isCurrent ? 'ring-sky-400 dark:ring-sky-500' : 'ring-transparent'
+                        } ${color.bg} ${color.text}`}
+                      >
+                        {b.person.substring(0, 2).toUpperCase()}
                       </div>
 
-                      {/* Person Full Name */}
-                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[68px] text-center mb-0.5">
+                      {/* Person Name */}
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[68px] text-center mb-1.5">
                         {b.person}
                       </p>
 
-                      {/* Sleek Vertical Stem Indicator */}
-                      <div className="w-0.5 h-7 bg-slate-100 dark:bg-slate-800 my-0.5 relative flex items-center justify-center">
-                        <div
-                          className={`w-2 h-2 rounded-full absolute ${
-                            isPositive
-                              ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50'
-                              : isNegative
-                              ? 'bg-rose-500 shadow-sm shadow-rose-500/50'
-                              : 'bg-slate-300 dark:bg-slate-600'
-                          }`}
-                        />
-                      </div>
-
-                      {/* Modern Balance Tag */}
+                      {/* Balance pill — replaces the thin stem */}
                       <span
-                        className={`text-[11px] font-black px-2 py-0.5 rounded-lg mt-0.5 whitespace-nowrap font-mono ${
+                        className={`text-[11px] font-black px-2 py-0.5 rounded-lg whitespace-nowrap font-mono ${
                           isPositive
                             ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
                             : isNegative
@@ -122,16 +99,13 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
               </div>
             </div>
 
-            {/* 2. Sleek Connected Payoff Ribbons (With explicit names) */}
+            {/* 2. Suggested Payoffs */}
             <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center justify-between mb-3.5">
-                <div className="flex items-center gap-1.5">
-                  <ArrowRightLeft className="w-3.5 h-3.5 text-sky-500" />
-                  <h4 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Suggested Debt Payoffs ({pendingSettlements.length})
-                  </h4>
-                </div>
-                <span className="text-[10px] text-slate-400 font-medium">Min-flow</span>
+              <div className="flex items-center gap-1.5 mb-3.5">
+                <ArrowRightLeft className="w-3.5 h-3.5 text-sky-500" />
+                <h4 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Suggested Payoffs ({pendingSettlements.length})
+                </h4>
               </div>
 
               {pendingSettlements.length === 0 ? (
@@ -155,9 +129,9 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
                         key={tx.id || idx}
                         className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all flex items-center justify-between shadow-sm"
                       >
-                        {/* Connected Arrow Flow */}
+                        {/* From → Amount → To */}
                         <div className="flex items-center gap-2.5 flex-1 min-w-0 mr-3">
-                          {/* Debtor Avatar & Name */}
+                          {/* Debtor */}
                           <div className="flex flex-col items-center shrink-0 min-w-[48px]">
                             <div
                               className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black shadow-sm ${fromColor.bg} ${fromColor.text}`}
@@ -169,11 +143,8 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
                             </span>
                           </div>
 
-                          {/* Arrow Ribbon with Clear Title & Amount */}
+                          {/* Arrow with amount */}
                           <div className="flex-1 flex flex-col items-center px-1">
-                            <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-tight">
-                              {tx.from} pays {tx.to}
-                            </span>
                             <div className="w-full flex items-center my-1">
                               <div className="h-0.5 flex-1 bg-gradient-to-r from-slate-200 via-sky-400 to-emerald-400 dark:from-slate-700 dark:via-sky-600 dark:to-emerald-500" />
                               <ArrowRight className="w-3.5 h-3.5 text-emerald-500 shrink-0 -ml-1" />
@@ -183,7 +154,7 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
                             </span>
                           </div>
 
-                          {/* Creditor Avatar & Name */}
+                          {/* Creditor */}
                           <div className="flex flex-col items-center shrink-0 min-w-[48px]">
                             <div
                               className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black shadow-sm ${toColor.bg} ${toColor.text}`}
@@ -196,7 +167,7 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
                           </div>
                         </div>
 
-                        {/* Modern Settle Button */}
+                        {/* Settle Button */}
                         <button
                           onClick={() => onSettleUp(tx)}
                           title={`Record ${tx.from} paid ${tx.to} ${symbol}${tx.amount.toFixed(2)}`}
@@ -212,13 +183,13 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
               )}
             </div>
 
-            {/* 3. Settled Payment History */}
+            {/* 3. Settlement History */}
             {settlementHistory.length > 0 && (
               <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm">
                 <div className="flex items-center gap-1.5 mb-3">
                   <Clock className="w-3.5 h-3.5 text-emerald-500" />
                   <h4 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Settled Repayments Log ({settlementHistory.length})
+                    Payment History ({settlementHistory.length})
                   </h4>
                 </div>
 
@@ -232,7 +203,7 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                         <div>
                           <p className="font-bold text-slate-800 dark:text-slate-200">
-                            {rec.from} paid {rec.to}
+                            {rec.from} → {rec.to}
                           </p>
                           <p className="text-[10px] text-slate-400">
                             {formatTimeAgo(rec.timestamp)}
@@ -245,17 +216,33 @@ export const DebtSettlementView: React.FC<DebtSettlementViewProps> = ({
                           {getCurrencySymbol(rec.currency)}{rec.amount.toFixed(2)}
                         </span>
                         {onDeleteSettlement && (
-                          <button
-                            onClick={() => {
-                              if (confirm(`Undo repayment of ${rec.from} to ${rec.to}?`)) {
-                                onDeleteSettlement(rec.id);
-                              }
-                            }}
-                            className="text-slate-300 hover:text-rose-500 p-1"
-                            title="Undo this payment"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          confirmUndoId === rec.id ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  setConfirmUndoId(null);
+                                  onDeleteSettlement(rec.id);
+                                }}
+                                className="px-2 py-0.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-bold transition"
+                              >
+                                Undo
+                              </button>
+                              <button
+                                onClick={() => setConfirmUndoId(null)}
+                                className="px-2 py-0.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-semibold transition"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmUndoId(rec.id)}
+                              className="text-slate-300 hover:text-rose-500 p-1 transition"
+                              title="Undo this payment"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )
                         )}
                       </div>
                     </div>

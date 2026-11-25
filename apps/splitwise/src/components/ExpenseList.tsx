@@ -28,10 +28,10 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   groupMeta
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedMember, setSelectedMember] = useState<string>('ALL');
   const [selectedExpenseForDetail, setSelectedExpenseForDetail] = useState<Expense | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   // Strictly filter out any settlement records from the Bills list
   const genuineExpenses = expenses.filter(e => !isSettlementItem(e));
@@ -53,28 +53,22 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
         exp.payer.toLowerCase().includes(searchQuery.toLowerCase()) ||
         exp.participants.some(p => p.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchesCategory =
-        selectedCategory === 'ALL' || exp.category === selectedCategory;
-
       const matchesMember =
         selectedMember === 'ALL' ||
         exp.payer.toLowerCase() === selectedMember.toLowerCase() ||
         exp.participants.some(p => p.toLowerCase() === selectedMember.toLowerCase());
 
-      return matchesSearch && matchesCategory && matchesMember;
+      return matchesSearch && matchesMember;
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
   return (
     <div className="px-4 py-3">
-      {/* Section Header */}
+      {/* Section Header — just the label, no duplicate count */}
       <div className="flex items-center justify-between mb-2.5">
         <h3 className="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight">
           Recent Bills
         </h3>
-        <span className="text-xs font-bold text-sky-600 dark:text-sky-400">
-          {genuineExpenses.length} {genuineExpenses.length === 1 ? 'bill' : 'bills'}
-        </span>
       </div>
 
       {/* Search & Member Filter */}
@@ -214,19 +208,17 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                         -{symbol}{personalAmount.toFixed(2)}
                       </p>
                     )}
-                    {personalType === 'none' && (
-                      <p className="text-xs font-bold text-slate-500 dark:text-slate-400 leading-tight">
-                        {symbol}{Number(expense.amount).toFixed(2)}
-                      </p>
-                    )}
+                    {personalType === 'none' && null}
 
+                    {personalType !== 'none' && (
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
                       {personalType === 'lent'
                         ? 'you lent'
                         : personalType === 'share'
                         ? 'your share'
-                        : 'not in bill'}
+                        : ''}
                     </p>
+                    )}
                   </div>
 
                   {/* 3-Dot Vertical Menu (Replaces Edit & Delete icons) */}
@@ -234,6 +226,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                     <button
                       onClick={e => {
                         e.stopPropagation();
+                        setConfirmingDeleteId(null);
                         setActiveMenuId(isMenuOpen ? null : expense.id);
                       }}
                       title="More actions"
@@ -250,15 +243,17 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                           onClick={e => {
                             e.stopPropagation();
                             setActiveMenuId(null);
+                            setConfirmingDeleteId(null);
                           }}
                         />
                         <div
                           onClick={e => e.stopPropagation()}
-                          className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 z-30 animate-in fade-in zoom-in-95 duration-100"
+                          className="absolute right-0 top-full mt-1 w-36 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 z-30 animate-in fade-in zoom-in-95 duration-100"
                         >
                           <button
                             onClick={() => {
                               setActiveMenuId(null);
+                              setConfirmingDeleteId(null);
                               onEditExpense(expense);
                             }}
                             className="w-full px-3 py-1.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
@@ -266,18 +261,34 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                             <Edit2 className="w-3.5 h-3.5 text-sky-500" />
                             <span>Edit</span>
                           </button>
-                          <button
-                            onClick={() => {
-                              setActiveMenuId(null);
-                              if (confirm(`Delete "${expense.description}"?`)) {
-                                onDeleteExpense(expense.id);
-                              }
-                            }}
-                            className="w-full px-3 py-1.5 text-left text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete</span>
-                          </button>
+                          {confirmingDeleteId === expense.id ? (
+                            <div className="px-2 py-1 flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  setConfirmingDeleteId(null);
+                                  onDeleteExpense(expense.id);
+                                }}
+                                className="flex-1 py-1 px-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-[11px] font-bold transition"
+                              >
+                                Delete
+                              </button>
+                              <button
+                                onClick={() => setConfirmingDeleteId(null)}
+                                className="py-1 px-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-semibold transition"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmingDeleteId(expense.id)}
+                              className="w-full px-3 py-1.5 text-left text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
                       </>
                     )}

@@ -19,7 +19,6 @@ interface HeaderProps {
   onToggleTheme: () => void;
   onOpenMeshModal: () => void;
   onOpenSwitchUser: () => void;
-  onOpenNewGroup: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,8 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   isDark,
   onToggleTheme,
   onOpenMeshModal,
-  onOpenSwitchUser,
-  onOpenNewGroup
+  onOpenSwitchUser
 }) => {
   const [copied, setCopied] = useState(false);
   const userColor = getAvatarColor(currentUserName || 'Member');
