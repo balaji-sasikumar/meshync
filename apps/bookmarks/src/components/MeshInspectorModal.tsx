@@ -80,8 +80,8 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
     if (canNativeShare) {
       try {
         await navigator.share({
-          title: spaceMeta?.name || 'Shared Bookmarks',
-          text: 'Join my encrypted P2P bookmarks space:',
+          title: 'LinkVault',
+          text: 'Join my encrypted P2P LinkVault space:',
           url: window.location.href
         });
         return;
@@ -186,7 +186,7 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
             </div>
             <div className="min-w-0">
               <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight truncate">
-                {spaceMeta?.name || 'Space & Network'}
+                LinkVault
               </h3>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span

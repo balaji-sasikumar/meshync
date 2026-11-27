@@ -24,7 +24,6 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   status,
-  spaceMeta,
   bookmarkCount,
   currentUserName,
   isDark,
@@ -43,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         <div className="min-w-0">
           <h1 className="text-base font-bold text-slate-900 dark:text-slate-100 tracking-[-0.015em] leading-tight truncate">
-            {spaceMeta?.name || 'Shared Bookmarks'}
+            LinkVault
           </h1>
           <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1.5 truncate">
             <ShieldCheck className="w-3 h-3 text-teal-600 dark:text-teal-400 shrink-0" strokeWidth={2} />

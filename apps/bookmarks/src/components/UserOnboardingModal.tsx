@@ -65,7 +65,7 @@ export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({
             <Users className="w-5 h-5" strokeWidth={1.75} />
           </div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-            {isChoosingExisting ? 'Who are you?' : 'Welcome to Bookmarks'}
+            {isChoosingExisting ? 'Who are you?' : 'Welcome to LinkVault'}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {isChoosingExisting

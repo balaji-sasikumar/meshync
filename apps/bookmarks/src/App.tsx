@@ -100,7 +100,7 @@ export const App: React.FC = () => {
     } else {
       addSpaceMeta({
         id: 'space_root',
-        name: 'Shared Bookmarks',
+        name: 'LinkVault',
         members: [trimmed],
         createdAt: Date.now()
       });
