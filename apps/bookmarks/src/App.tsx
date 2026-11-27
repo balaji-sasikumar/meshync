@@ -1,7 +1,6 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useMeshKernel, useCollection } from '@localfirst/mesh-sync';
 import type { Bookmark, SpaceMeta } from './domain/schema.ts';
-import { getDomain } from './domain/schema.ts';
 import { Header } from './components/Header.tsx';
 import { BookmarkItem } from './components/BookmarkItem.tsx';
 import { AddBookmarkModal } from './components/AddBookmarkModal.tsx';
@@ -9,7 +8,7 @@ import { TagFilter } from './components/TagFilter.tsx';
 import { MeshInspectorModal } from './components/MeshInspectorModal.tsx';
 import { UserOnboardingModal } from './components/UserOnboardingModal.tsx';
 import { SyncToast } from './components/SyncToast.tsx';
-import { Bookmark as BookmarkIcon, Loader2, ShieldAlert, Plus, Link2, Clipboard, Check } from 'lucide-react';
+import { Bookmark as BookmarkIcon, Loader2, ShieldAlert, Plus } from 'lucide-react';
 
 export const App: React.FC = () => {
   // 1. Decoupled headless mesh kernel
@@ -108,13 +107,10 @@ export const App: React.FC = () => {
     }
   };
 
-  // 5. Modals & Quick-Save State
+  // 5. Modals State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
   const [initialUrl, setInitialUrl] = useState('');
-  const [quickUrl, setQuickUrl] = useState('');
-  const [quickSaved, setQuickSaved] = useState(false);
-  const quickInputRef = useRef<HTMLInputElement>(null);
   const [isMeshModalOpen, setIsMeshModalOpen] = useState(false);
 
   // 6. Search & Filters State
@@ -201,62 +197,28 @@ export const App: React.FC = () => {
     setIsAddModalOpen(true);
   };
 
-  const handleOpenNewBookmark = (prefillUrl = '') => {
-    setEditingBookmark(null);
-    setInitialUrl(prefillUrl);
-    setIsAddModalOpen(true);
+  const isLikelyUrl = (text: string): boolean => {
+    const trimmed = text.trim();
+    if (!trimmed || /\s/.test(trimmed)) return false;
+    if (/^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(trimmed)) return true;
+    return /^(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d+)?(?:[/?#][^\s]*)?$/i.test(trimmed);
   };
 
-  const commitQuickUrl = (rawUrl: string): boolean => {
-    const trimmed = rawUrl.trim();
-    if (!trimmed) return false;
-    const formattedUrl =
-      trimmed.startsWith('http://') || trimmed.startsWith('https://')
-        ? trimmed
-        : `https://${trimmed}`;
-    const d = getDomain(formattedUrl);
-    const cleanName = d.split('.')[0];
-    const title = cleanName
-      ? cleanName.charAt(0).toUpperCase() + cleanName.slice(1)
-      : d;
-    addBookmark({
-      id: `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      url: formattedUrl,
-      title,
-      tags: [],
-      pinned: false,
-      archived: false,
-      author: currentUserName || 'Anonymous',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    });
-    setQuickUrl('');
-    setQuickSaved(true);
-    setTimeout(() => setQuickSaved(false), 1600);
-    return true;
-  };
-
-  const handleQuickSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    commitQuickUrl(quickUrl);
-  };
-
-  const handleQuickPaste = async () => {
+  const handleOpenNewBookmark = async () => {
+    let prefill = '';
     try {
       if (navigator.clipboard?.readText) {
         const text = (await navigator.clipboard.readText()).trim();
-        if (/^https?:\/\//i.test(text) || /^[^\s]+\.[^\s]{2,}$/.test(text)) {
-          commitQuickUrl(text);
-          return;
-        }
-        if (text) {
-          setQuickUrl(text);
+        if (isLikelyUrl(text)) {
+          prefill = text;
         }
       }
     } catch {
-      // Clipboard permission not granted; focus input for manual paste
+      // Clipboard permission not granted or unavailable; proceed with normal save link flow
     }
-    quickInputRef.current?.focus();
+    setEditingBookmark(null);
+    setInitialUrl(prefill);
+    setIsAddModalOpen(true);
   };
 
   const handleTogglePin = (id: string, current: boolean) => {
@@ -359,63 +321,21 @@ export const App: React.FC = () => {
 
         {/* SCROLLABLE MAIN CONTENT */}
         <main className="px-4 pt-3.5 pb-24 flex-1 space-y-3.5">
-          {/* Unified Quick-Save + Search & Filters Browsing Section */}
-          <div className="space-y-2.5">
-            {/* Compact Quick-Save URL Input */}
-            <form
-              onSubmit={handleQuickSubmit}
-              className="h-9 flex items-center gap-2 pl-3 pr-1.5 rounded-xl bg-white/85 dark:bg-[#121721] border border-slate-200/80 dark:border-slate-800 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:bg-white dark:focus-within:bg-[#121721] transition overflow-hidden"
-            >
-              <Link2 className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" strokeWidth={1.75} />
-              <input
-                ref={quickInputRef}
-                type="text"
-                value={quickUrl}
-                onChange={e => setQuickUrl(e.target.value)}
-                placeholder="Paste a link to save..."
-                aria-label="Paste a link to save"
-                className="flex-1 min-w-0 w-full pr-1 bg-transparent text-base sm:text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none truncate"
-              />
-              {quickSaved ? (
-                <span className="h-6 px-2 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 text-[11px] font-semibold inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
-                  <Check className="w-3 h-3" strokeWidth={2} />
-                  <span>Saved</span>
-                </span>
-              ) : quickUrl.trim() ? (
-                <button
-                  type="submit"
-                  className="h-6 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold transition shrink-0 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-                >
-                  Save
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleQuickPaste}
-                  className="h-6 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-medium inline-flex items-center gap-1 transition shrink-0 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-                >
-                  <Clipboard className="w-3 h-3" strokeWidth={1.75} />
-                  <span>Paste</span>
-                </button>
-              )}
-            </form>
-
-            {/* Tag Filter & Search */}
-            <TagFilter
-              tags={allTags}
-              totalCount={activeCount}
-              archivedCount={archivedCount}
-              selectedTag={selectedTag}
-              onSelectTag={setSelectedTag}
-              filterPinned={filterPinned}
-              onToggleFilterPinned={() => setFilterPinned(p => !p)}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              showArchived={showArchived}
-              onToggleShowArchived={() => setShowArchived(a => !a)}
-              pinnedCount={pinnedCount}
-            />
-          </div>
+          {/* Search & Filters */}
+          <TagFilter
+            tags={allTags}
+            totalCount={activeCount}
+            archivedCount={archivedCount}
+            selectedTag={selectedTag}
+            onSelectTag={setSelectedTag}
+            filterPinned={filterPinned}
+            onToggleFilterPinned={() => setFilterPinned(p => !p)}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            showArchived={showArchived}
+            onToggleShowArchived={() => setShowArchived(a => !a)}
+            pinnedCount={pinnedCount}
+          />
 
           {/* Bookmarks Card Feed */}
           {filteredBookmarks.length === 0 ? (
@@ -428,13 +348,13 @@ export const App: React.FC = () => {
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
                 {bookmarks.length === 0
-                  ? 'Paste a URL above to quick-save, or tap Save link for title, tags, and notes.'
+                  ? 'Tap Save link below to add your first bookmark to this encrypted P2P space.'
                   : 'Try clearing your search or selected tag filter.'}
               </p>
               {bookmarks.length === 0 && (
                 <button
                   type="button"
-                  onClick={() => handleOpenNewBookmark()}
+                  onClick={handleOpenNewBookmark}
                   className="mt-1 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition active:scale-95 inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 >
                   <Plus className="w-3.5 h-3.5" strokeWidth={2} />
@@ -462,11 +382,11 @@ export const App: React.FC = () => {
         </main>
       </div>
 
-      {/* Anchored Primary Action Pill (lighter height & softer shadow) */}
+      {/* Anchored Primary Action Pill (checks clipboard URL automatically) */}
       <div className="fixed bottom-5 pb-[env(safe-area-inset-bottom)] left-1/2 -translate-x-1/2 w-full max-w-md px-4 flex justify-end pointer-events-none z-30">
         <button
           type="button"
-          onClick={() => handleOpenNewBookmark()}
+          onClick={handleOpenNewBookmark}
           className="pointer-events-auto h-9 px-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-slate-900/15 flex items-center gap-1.5 text-xs font-medium transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
           title="Save link with title, tags, and notes"
         >
