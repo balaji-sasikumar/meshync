@@ -61,10 +61,10 @@ export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({
 
         {/* Header Icon & Title */}
         <div className="text-center mb-5">
-          <div className="w-12 h-12 bg-sky-100 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 rounded-2xl flex items-center justify-center mx-auto mb-2.5 shadow-inner">
-            <Users className="w-6 h-6" />
+          <div className="w-12 h-12 bg-blue-600/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-2.5">
+            <Users className="w-5 h-5" strokeWidth={1.75} />
           </div>
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
             {isChoosingExisting ? 'Who are you?' : 'Welcome to Bookmarks'}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -76,8 +76,8 @@ export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({
 
         {/* Peer Status Badge (Non-blocking) */}
         {peersCount > 0 && (
-          <div className="flex items-center justify-center gap-1.5 mb-4 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <div className="flex items-center justify-center gap-1.5 mb-4 text-[11px] font-semibold text-teal-600 dark:text-teal-400">
+            <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
             <span>{peersCount} peer{peersCount > 1 ? 's' : ''} connected in encrypted mesh</span>
           </div>
         )}
@@ -102,18 +102,18 @@ export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({
                   onClick={() => onSelectUser(name)}
                   className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all text-left group ${
                     isSelected
-                      ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-400 dark:border-sky-700 shadow-sm'
-                      : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 shadow-sm'
+                      : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-blue-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shadow-sm ${color.bg} ${color.text}`}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${color.bg} ${color.text}`}
                     >
                       {name.substring(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900 dark:text-white text-sm">
+                      <p className="font-semibold text-slate-900 dark:text-white text-sm">
                         {name}
                       </p>
                       <p className="text-[11px] text-slate-400">
@@ -123,11 +123,11 @@ export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({
                   </div>
 
                   {isSelected ? (
-                    <div className="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-sm">
+                    <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm">
                       <Check className="w-3.5 h-3.5" />
                     </div>
                   ) : (
-                    <ArrowRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-sky-500 group-hover:translate-x-0.5 transition-all" />
+                    <ArrowRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
                   )}
                 </button>
               );
@@ -139,7 +139,7 @@ export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({
                 setShowAddNew(true);
                 setErrorMessage(null);
               }}
-              className="w-full py-2.5 px-3 border border-dashed border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-bold hover:border-sky-400 hover:text-sky-600 hover:bg-sky-50/50 dark:hover:bg-sky-950/20 transition-all flex items-center justify-center gap-1.5 mt-2.5"
+              className="w-full py-2.5 px-3 border border-dashed border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-semibold hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all flex items-center justify-center gap-1.5 mt-2.5"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>I'm not listed (Add my name)</span>
@@ -159,7 +159,7 @@ export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({
                 value={customNameInput}
                 onChange={e => setCustomNameInput(e.target.value)}
                 placeholder="Enter your name (e.g. Alex)..."
-                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-white"
+                className="w-full px-3.5 py-2.5 text-base sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 text-slate-900 dark:text-white"
               />
             </div>
 
@@ -171,14 +171,14 @@ export const UserOnboardingModal: React.FC<UserOnboardingModalProps> = ({
                     setShowAddNew(false);
                     setErrorMessage(null);
                   }}
-                  className="w-1/3 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                  className="w-1/3 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                 >
                   Back
                 </button>
               )}
               <button
                 type="submit"
-                className={`py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-xl text-xs shadow-md shadow-sky-500/20 transition flex items-center justify-center gap-1.5 ${
+                className={`py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5 ${
                   validMembers.length > 0 ? 'w-2/3' : 'w-full'
                 }`}
               >

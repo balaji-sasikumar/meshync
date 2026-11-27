@@ -8,6 +8,7 @@ interface AddBookmarkModalProps {
   onClose: () => void;
   onSubmit: (data: Omit<Bookmark, 'id' | 'createdAt' | 'updatedAt'>, editId?: string) => void;
   editingBookmark?: Bookmark | null;
+  initialUrl?: string;
   existingTags: string[];
   currentUserName: string;
 }
@@ -17,6 +18,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
   onClose,
   onSubmit,
   editingBookmark = null,
+  initialUrl = '',
   existingTags,
   currentUserName
 }) => {
@@ -36,15 +38,21 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
         setSelectedTags(editingBookmark.tags || []);
         setPinned(editingBookmark.pinned);
       } else {
-        setUrl('');
-        setTitle('');
+        setUrl(initialUrl);
+        if (initialUrl.trim()) {
+          const d = getDomain(initialUrl);
+          const cleanName = d.split('.')[0];
+          setTitle(cleanName ? cleanName.charAt(0).toUpperCase() + cleanName.slice(1) : '');
+        } else {
+          setTitle('');
+        }
         setDescription('');
         setSelectedTags([]);
         setPinned(false);
       }
       setNewTagInput('');
     }
-  }, [isOpen, editingBookmark]);
+  }, [isOpen, editingBookmark, initialUrl]);
 
   if (!isOpen) return null;
 
@@ -84,12 +92,18 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
       formattedUrl = `https://${formattedUrl}`;
     }
 
+    const pendingTag = newTagInput.trim().replace(/^#/, '');
+    const finalTags =
+      pendingTag && !selectedTags.includes(pendingTag)
+        ? [...selectedTags, pendingTag]
+        : selectedTags;
+
     onSubmit(
       {
         url: formattedUrl,
         title: title.trim(),
         description: description.trim() || undefined,
-        tags: selectedTags,
+        tags: finalTags,
         pinned,
         archived: editingBookmark ? editingBookmark.archived : false,
         author: editingBookmark?.author || currentUserName || 'Anonymous'
@@ -100,7 +114,10 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
     onClose();
   };
 
-  const allAvailableTags = Array.from(new Set([...PRESET_TAGS, ...existingTags]));
+  // Put user-created / previously used tags and active selections first so they are never hidden behind presets
+  const allAvailableTags = Array.from(
+    new Set([...existingTags, ...selectedTags, ...PRESET_TAGS])
+  );
   const userColor = getAvatarColor(currentUserName || 'Author');
 
   return (
@@ -110,8 +127,13 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 relative border border-slate-100 dark:border-slate-800 max-h-[92vh] overflow-y-auto"
+        className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6 relative border-t sm:border border-slate-100 dark:border-slate-800 max-h-[90dvh] sm:max-h-[92vh] overflow-y-auto overscroll-contain"
       >
+        {/* Mobile bottom-sheet drag handle */}
+        <div className="sm:hidden flex justify-center -mt-2 mb-3">
+          <div className="w-9 h-1 rounded-full bg-slate-200 dark:bg-slate-700" />
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
           <div>
@@ -138,7 +160,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <Globe className="w-4 h-4" />
+                <Globe className="w-4 h-4" strokeWidth={1.75} />
               </span>
               <input
                 type="text"
@@ -148,7 +170,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
                 onChange={e => setUrl(e.target.value)}
                 onBlur={handleUrlBlur}
                 placeholder="https://github.com/..."
-                className="w-full pl-9 pr-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition dark:text-white font-mono"
+                className="w-full pl-9 pr-3.5 py-2 text-base sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition dark:text-white font-mono"
               />
             </div>
           </div>
@@ -164,7 +186,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="e.g. Local-First Software Manifesto"
-              className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition dark:text-white"
+              className="w-full px-3.5 py-2 text-base sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition dark:text-white"
             />
           </div>
 
@@ -178,7 +200,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Key insights, context, or summary..."
-              className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 transition dark:text-white resize-none"
+              className="w-full px-3.5 py-2 text-base sm:text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition dark:text-white resize-none"
             />
           </div>
 
@@ -190,8 +212,8 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
               </label>
             </div>
 
-            {/* Quick Preset Tag Pills */}
-            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto mb-2">
+            {/* Tag Pills (created tags + presets, all visible without vertical clipping) */}
+            <div className="flex flex-wrap gap-1.5 mb-2.5">
               {allAvailableTags.map(tag => {
                 const isSelected = selectedTags.includes(tag);
                 return (
@@ -199,9 +221,9 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
                     key={tag}
                     type="button"
                     onClick={() => handleToggleTag(tag)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition border ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition border ${
                       isSelected
-                        ? 'bg-sky-500 border-sky-500 text-white shadow-sm'
+                        ? 'bg-blue-600 border-blue-600 text-white'
                         : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                     }`}
                   >
@@ -224,13 +246,13 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
                   }
                 }}
                 placeholder="New tag..."
-                className="flex-1 px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white"
+                className="flex-1 min-w-0 px-3 py-1.5 text-base sm:text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 dark:text-white"
               />
               <button
                 type="button"
                 onClick={() => handleAddCustomTag()}
                 disabled={!newTagInput.trim()}
-                className="px-3.5 py-1.5 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 rounded-xl text-xs font-bold transition"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 rounded-xl text-xs font-semibold transition shrink-0"
               >
                 + Tag
               </button>
@@ -241,7 +263,7 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div
-                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${userColor.bg} ${userColor.text}`}
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${userColor.bg} ${userColor.text}`}
               >
                 {(currentUserName || 'A').substring(0, 1).toUpperCase()}
               </div>
@@ -255,18 +277,18 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
                 type="checkbox"
                 checked={pinned}
                 onChange={e => setPinned(e.target.checked)}
-                className="w-4 h-4 rounded text-sky-500 focus:ring-sky-500 border-slate-300 dark:border-slate-600 cursor-pointer"
+                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600 cursor-pointer"
               />
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pin to top</span>
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Pin to top</span>
             </label>
           </div>
 
           <button
             type="submit"
             disabled={!url.trim() || !title.trim()}
-            className="w-full py-2.5 bg-sky-500 hover:bg-sky-600 active:scale-[0.98] text-white font-extrabold rounded-xl shadow-lg shadow-sky-500/25 transition flex items-center justify-center gap-2 disabled:opacity-50 mt-1"
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-semibold rounded-xl shadow-sm transition flex items-center justify-center gap-2 disabled:opacity-50 mt-1"
           >
-            <Check className="w-4 h-4" />
+            <Check className="w-4 h-4" strokeWidth={2} />
             <span>{editingBookmark ? 'Update Link' : 'Save Link'}</span>
           </button>
         </form>

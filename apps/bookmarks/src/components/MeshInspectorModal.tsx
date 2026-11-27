@@ -65,12 +65,31 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
 
   if (!isOpen) return null;
 
+  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
   const handleCopyLink = () => {
     if (typeof window !== 'undefined') {
       navigator.clipboard.writeText(window.location.href);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     }
+  };
+
+  const handleNativeShare = async () => {
+    if (typeof window === 'undefined') return;
+    if (canNativeShare) {
+      try {
+        await navigator.share({
+          title: spaceMeta?.name || 'Shared Bookmarks',
+          text: 'Join my encrypted P2P bookmarks space:',
+          url: window.location.href
+        });
+        return;
+      } catch {
+        // User cancelled or share failed; fall back silently
+      }
+    }
+    handleCopyLink();
   };
 
   const handleCopyCid = (cid: string) => {
@@ -152,21 +171,26 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border-t sm:border border-slate-100 dark:border-slate-800 max-h-[88dvh] sm:max-h-[90vh] flex flex-col overflow-hidden"
       >
+        {/* Mobile bottom-sheet drag handle */}
+        <div className="sm:hidden flex justify-center pt-2.5 pb-0.5 shrink-0">
+          <div className="w-9 h-1 rounded-full bg-slate-200 dark:bg-slate-700" />
+        </div>
+
         {/* Modal Header */}
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-              <Radio className="w-5 h-5" />
+        <div className="px-4 sm:px-6 pt-3 sm:pt-5 pb-3.5 sm:pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <Radio className="w-5 h-5" strokeWidth={1.75} />
             </div>
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
+            <div className="min-w-0">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight truncate">
                 {spaceMeta?.name || 'Space & Network'}
               </h3>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span
-                  className={`w-2 h-2 rounded-full ${
+                  className={`w-2 h-2 rounded-full shrink-0 ${
                     status.isSimulatedOffline
                       ? 'bg-rose-500'
                       : status.peersCount > 0
@@ -174,7 +198,7 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
                       : 'bg-amber-400'
                   }`}
                 />
-                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
                   {status.isSimulatedOffline
                     ? 'Offline simulation active'
                     : status.peersCount > 0
@@ -187,36 +211,60 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="p-5 space-y-4 overflow-y-auto">
+        <div className="p-4 sm:p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 space-y-3.5 sm:space-y-4 overflow-y-auto overscroll-contain">
           {/* 1. Primary Action: Invite Friends / Share Link */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-50/60 dark:from-sky-950/40 dark:to-slate-800/60 border border-sky-100 dark:border-sky-900/50">
+          <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50">
             <div className="mb-3">
-              <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Share2 className="w-3.5 h-3.5 text-sky-500" />
+              <p className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Share2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" strokeWidth={1.75} />
                 <span>Invite Friends</span>
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
                 Share this link so friends join directly. Keys stay inside the URL fragment.
               </p>
             </div>
-            <button
-              onClick={handleCopyLink}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] ${
-                copiedLink
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-sky-500 hover:bg-sky-600 text-white shadow-sky-500/20'
-              }`}
-            >
-              {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              <span>{copiedLink ? 'Invite Link Copied!' : 'Copy Encrypted Share Link'}</span>
-            </button>
+            {canNativeShare ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleNativeShare}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                >
+                  <Share2 className="w-4 h-4" strokeWidth={1.75} />
+                  <span>Share Invite Link</span>
+                </button>
+                <button
+                  onClick={handleCopyLink}
+                  title="Copy link"
+                  className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 border active:scale-[0.98] shrink-0 ${
+                    copiedLink
+                      ? 'bg-teal-600 border-teal-600 text-white'
+                      : 'bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40'
+                  }`}
+                >
+                  {copiedLink ? <Check className="w-4 h-4" strokeWidth={2} /> : <Copy className="w-4 h-4" strokeWidth={1.75} />}
+                  <span>{copiedLink ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleCopyLink}
+                className={`w-full py-2.5 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] ${
+                  copiedLink
+                    ? 'bg-teal-600 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {copiedLink ? <Check className="w-4 h-4" strokeWidth={2} /> : <Copy className="w-4 h-4" strokeWidth={1.75} />}
+                <span>{copiedLink ? 'Invite Link Copied!' : 'Copy Encrypted Share Link'}</span>
+              </button>
+            )}
           </div>
 
           {/* 2. Space Members */}
@@ -257,12 +305,12 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
                   value={newMember}
                   onChange={e => setNewMember(e.target.value)}
                   placeholder="Add member name..."
-                  className="flex-1 px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white"
+                  className="flex-1 min-w-0 px-3 py-2 text-base sm:text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 dark:text-white"
                 />
                 <button
                   type="submit"
                   disabled={!newMember.trim()}
-                  className="px-3.5 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 rounded-xl text-xs font-bold transition"
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white disabled:text-slate-400 rounded-xl text-xs font-semibold transition shrink-0"
                 >
                   Add
                 </button>
@@ -270,46 +318,7 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
             </div>
           )}
 
-          {/* 3. Backup & Switch Apps */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={onExportJson}
-              className="py-2.5 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5"
-            >
-              <Download className="w-3.5 h-3.5 text-sky-500" />
-              <span>Export JSON</span>
-            </button>
-            <label className="py-2.5 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer">
-              <Upload className="w-3.5 h-3.5 text-sky-500" />
-              <span>Import JSON</span>
-              <input type="file" accept=".json" onChange={handleFileInput} className="hidden" />
-            </label>
-          </div>
-          {importNotice && (
-            <p className={`text-[11px] font-medium text-center -mt-2 ${importNotice.type === 'ok' ? 'text-emerald-500' : 'text-rose-500'}`}>
-              {importNotice.text}
-            </p>
-          )}
-
-          {/* Quick App Links */}
-          <div className="grid grid-cols-2 gap-2">
-            <a
-              href="../splitwise/"
-              className="py-2 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition flex items-center justify-center gap-1.5"
-            >
-              <Receipt className="w-3.5 h-3.5 text-emerald-500" />
-              <span>PeerSplit</span>
-            </a>
-            <a
-              href="../"
-              className="py-2 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition flex items-center justify-center gap-1.5"
-            >
-              <LayoutGrid className="w-3.5 h-3.5 text-slate-400" />
-              <span>All Apps</span>
-            </a>
-          </div>
-
-          {/* 4. Collapsible Technical Network & IPFS Details */}
+          {/* 3. Collapsible More, Backup & Diagnostics */}
           <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
             <button
               type="button"
@@ -318,7 +327,7 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
             >
               <span className="flex items-center gap-2">
                 <ShieldCheck className="w-3.5 h-3.5 text-sky-500" />
-                <span>P2P & IPFS Diagnostics</span>
+                <span>Backup, Apps & Diagnostics</span>
               </span>
               <span className="flex items-center gap-2 text-[10px] font-mono text-slate-400">
                 <span>AES-256</span>
@@ -328,6 +337,45 @@ export const MeshInspectorModal: React.FC<MeshInspectorModalProps> = ({
 
             {showAdvanced && (
               <div className="p-3.5 space-y-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+                {/* Export / Import JSON */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={onExportJson}
+                    className="py-2 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5 text-sky-500" />
+                    <span>Export JSON</span>
+                  </button>
+                  <label className="py-2 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer">
+                    <Upload className="w-3.5 h-3.5 text-sky-500" />
+                    <span>Import JSON</span>
+                    <input type="file" accept=".json" onChange={handleFileInput} className="hidden" />
+                  </label>
+                </div>
+                {importNotice && (
+                  <p className={`text-[11px] font-medium text-center ${importNotice.type === 'ok' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    {importNotice.text}
+                  </p>
+                )}
+
+                {/* Quick App Links */}
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href="../splitwise/"
+                    className="py-2 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition flex items-center justify-center gap-1.5"
+                  >
+                    <Receipt className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>PeerSplit</span>
+                  </a>
+                  <a
+                    href="../"
+                    className="py-2 px-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition flex items-center justify-center gap-1.5"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5 text-slate-400" />
+                    <span>All Apps</span>
+                  </a>
+                </div>
+
                 {/* Offline Simulation */}
                 <button
                   onClick={handleToggleOffline}

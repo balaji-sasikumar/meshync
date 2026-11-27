@@ -42,6 +42,20 @@ export function getDomain(urlStr: string): string {
   }
 }
 
+export function getDisplayUrl(urlStr: string): string {
+  try {
+    const formatted = urlStr.startsWith('http://') || urlStr.startsWith('https://')
+      ? urlStr
+      : `https://${urlStr}`;
+    const parsed = new URL(formatted);
+    const host = parsed.hostname.replace(/^www\./, '');
+    const path = `${parsed.pathname}${parsed.search}`.replace(/\/$/, '');
+    return path && path !== '/' ? `${host}${path}` : host;
+  } catch {
+    return urlStr;
+  }
+}
+
 export function getFaviconUrl(urlStr: string): string {
   const domain = getDomain(urlStr);
   return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;

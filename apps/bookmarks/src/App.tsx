@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useMeshKernel, useCollection } from '@localfirst/mesh-sync';
 import type { Bookmark, SpaceMeta } from './domain/schema.ts';
+import { getDomain } from './domain/schema.ts';
 import { Header } from './components/Header.tsx';
 import { BookmarkItem } from './components/BookmarkItem.tsx';
 import { AddBookmarkModal } from './components/AddBookmarkModal.tsx';
@@ -8,7 +9,7 @@ import { TagFilter } from './components/TagFilter.tsx';
 import { MeshInspectorModal } from './components/MeshInspectorModal.tsx';
 import { UserOnboardingModal } from './components/UserOnboardingModal.tsx';
 import { SyncToast } from './components/SyncToast.tsx';
-import { Bookmark as BookmarkIcon, Loader2, ShieldAlert, Plus } from 'lucide-react';
+import { Bookmark as BookmarkIcon, Loader2, ShieldAlert, Plus, Link2, Clipboard, Check } from 'lucide-react';
 
 export const App: React.FC = () => {
   // 1. Decoupled headless mesh kernel
@@ -107,9 +108,13 @@ export const App: React.FC = () => {
     }
   };
 
-  // 5. Modals State
+  // 5. Modals & Quick-Save State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
+  const [initialUrl, setInitialUrl] = useState('');
+  const [quickUrl, setQuickUrl] = useState('');
+  const [quickSaved, setQuickSaved] = useState(false);
+  const quickInputRef = useRef<HTMLInputElement>(null);
   const [isMeshModalOpen, setIsMeshModalOpen] = useState(false);
 
   // 6. Search & Filters State
@@ -122,9 +127,17 @@ export const App: React.FC = () => {
   const allTags = useMemo(() => {
     const set = new Set<string>();
     for (const b of bookmarks) {
-      for (const t of b.tags) set.add(t);
+      for (const t of b.tags || []) set.add(t);
     }
     return Array.from(set).sort();
+  }, [bookmarks]);
+
+  const activeCount = useMemo(() => {
+    return bookmarks.filter(b => !b.archived).length;
+  }, [bookmarks]);
+
+  const archivedCount = useMemo(() => {
+    return bookmarks.filter(b => b.archived).length;
   }, [bookmarks]);
 
   const pinnedCount = useMemo(() => {
@@ -183,8 +196,67 @@ export const App: React.FC = () => {
   };
 
   const handleEditClick = (bm: Bookmark) => {
+    setInitialUrl('');
     setEditingBookmark(bm);
     setIsAddModalOpen(true);
+  };
+
+  const handleOpenNewBookmark = (prefillUrl = '') => {
+    setEditingBookmark(null);
+    setInitialUrl(prefillUrl);
+    setIsAddModalOpen(true);
+  };
+
+  const commitQuickUrl = (rawUrl: string): boolean => {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return false;
+    const formattedUrl =
+      trimmed.startsWith('http://') || trimmed.startsWith('https://')
+        ? trimmed
+        : `https://${trimmed}`;
+    const d = getDomain(formattedUrl);
+    const cleanName = d.split('.')[0];
+    const title = cleanName
+      ? cleanName.charAt(0).toUpperCase() + cleanName.slice(1)
+      : d;
+    addBookmark({
+      id: `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      url: formattedUrl,
+      title,
+      tags: [],
+      pinned: false,
+      archived: false,
+      author: currentUserName || 'Anonymous',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+    setQuickUrl('');
+    setQuickSaved(true);
+    setTimeout(() => setQuickSaved(false), 1600);
+    return true;
+  };
+
+  const handleQuickSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    commitQuickUrl(quickUrl);
+  };
+
+  const handleQuickPaste = async () => {
+    try {
+      if (navigator.clipboard?.readText) {
+        const text = (await navigator.clipboard.readText()).trim();
+        if (/^https?:\/\//i.test(text) || /^[^\s]+\.[^\s]{2,}$/.test(text)) {
+          commitQuickUrl(text);
+          return;
+        }
+        if (text) {
+          setQuickUrl(text);
+        }
+      }
+    } catch {
+      // Clipboard permission not granted; focus input for manual paste
+    }
+    quickInputRef.current?.focus();
   };
 
   const handleTogglePin = (id: string, current: boolean) => {
@@ -244,8 +316,8 @@ export const App: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#090b0e] flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-3xl p-6 max-w-sm text-center shadow-lg">
+      <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#0B0E14] flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-2xl p-6 max-w-sm text-center shadow-sm">
           <ShieldAlert className="w-10 h-10 text-rose-500 mx-auto mb-3" />
           <h2 className="text-base font-bold text-rose-800 dark:text-rose-200">Mesh Engine Error</h2>
           <p className="text-xs text-rose-600 dark:text-rose-300/80 mt-1 font-mono">{error.message}</p>
@@ -256,26 +328,27 @@ export const App: React.FC = () => {
 
   if (!isReady || !status) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#090b0e] flex flex-col items-center justify-center p-4">
-        <Loader2 className="w-10 h-10 text-sky-400 animate-spin mb-3" />
-        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Connecting to P2P Mesh...</h2>
+      <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#0B0E14] flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin mb-3" />
+        <h2 className="text-sm font-medium text-slate-600 dark:text-slate-300">Connecting to P2P Mesh...</h2>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-[#090b0e] flex justify-center transition-colors duration-200">
-      {/* Mobile-Friendly Native Container (max-w-md on desktop, 100% on mobile) */}
-      <div className="w-full max-w-md bg-white dark:bg-[#0e1015] min-h-screen flex flex-col relative shadow-2xl pb-20 border-x border-slate-200/80 dark:border-slate-800/80">
+    <div className="min-h-screen bg-[#F5F7FA] dark:bg-[#0B0E14] flex justify-center transition-colors duration-200">
+      {/* Seamless App Column blending naturally into the viewport */}
+      <div className="w-full max-w-md bg-[#F5F7FA] dark:bg-[#0B0E14] min-h-screen flex flex-col relative">
         {/* Floating Minimal Sync Toast */}
         <SyncToast status={status} />
 
-        {/* STICKY TOP CONTAINER: Greeting Header */}
-        <div className="sticky top-0 z-30 bg-white/95 dark:bg-[#0e1015]/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 transition-colors duration-200">
+        {/* STICKY TOP CONTAINER: Header */}
+        <div className="sticky top-0 z-30 bg-[#F5F7FA]/90 dark:bg-[#0B0E14]/90 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60 transition-colors duration-200">
           <Header
             kernel={kernel}
             status={status}
             spaceMeta={spaceMeta}
+            bookmarkCount={activeCount}
             currentUserName={currentUserName}
             isDark={isDark}
             onToggleTheme={toggleTheme}
@@ -285,55 +358,98 @@ export const App: React.FC = () => {
         </div>
 
         {/* SCROLLABLE MAIN CONTENT */}
-        <main className="px-4 pt-2 pb-24 flex-1">
-          {/* Tag Filter & Search */}
-          <TagFilter
-            tags={allTags}
-            selectedTag={selectedTag}
-            onSelectTag={setSelectedTag}
-            filterPinned={filterPinned}
-            onToggleFilterPinned={() => setFilterPinned(p => !p)}
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            showArchived={showArchived}
-            onToggleShowArchived={() => setShowArchived(a => !a)}
-            pinnedCount={pinnedCount}
-          />
+        <main className="px-4 pt-3.5 pb-24 flex-1 space-y-3.5">
+          {/* Unified Quick-Save + Search & Filters Browsing Section */}
+          <div className="space-y-2.5">
+            {/* Compact Quick-Save URL Input */}
+            <form
+              onSubmit={handleQuickSubmit}
+              className="h-9 flex items-center gap-2 pl-3 pr-1.5 rounded-xl bg-white/85 dark:bg-[#121721] border border-slate-200/80 dark:border-slate-800 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:bg-white dark:focus-within:bg-[#121721] transition overflow-hidden"
+            >
+              <Link2 className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" strokeWidth={1.75} />
+              <input
+                ref={quickInputRef}
+                type="text"
+                value={quickUrl}
+                onChange={e => setQuickUrl(e.target.value)}
+                placeholder="Paste a link to save..."
+                aria-label="Paste a link to save"
+                className="flex-1 min-w-0 w-full pr-1 bg-transparent text-base sm:text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none truncate"
+              />
+              {quickSaved ? (
+                <span className="h-6 px-2 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 text-[11px] font-semibold inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
+                  <Check className="w-3 h-3" strokeWidth={2} />
+                  <span>Saved</span>
+                </span>
+              ) : quickUrl.trim() ? (
+                <button
+                  type="submit"
+                  className="h-6 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold transition shrink-0 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                >
+                  Save
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleQuickPaste}
+                  className="h-6 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-medium inline-flex items-center gap-1 transition shrink-0 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                >
+                  <Clipboard className="w-3 h-3" strokeWidth={1.75} />
+                  <span>Paste</span>
+                </button>
+              )}
+            </form>
 
-          {/* Bookmarks List */}
+            {/* Tag Filter & Search */}
+            <TagFilter
+              tags={allTags}
+              totalCount={activeCount}
+              archivedCount={archivedCount}
+              selectedTag={selectedTag}
+              onSelectTag={setSelectedTag}
+              filterPinned={filterPinned}
+              onToggleFilterPinned={() => setFilterPinned(p => !p)}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              showArchived={showArchived}
+              onToggleShowArchived={() => setShowArchived(a => !a)}
+              pinnedCount={pinnedCount}
+            />
+          </div>
+
+          {/* Bookmarks Card Feed */}
           {filteredBookmarks.length === 0 ? (
-            <div className="bg-slate-50/80 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm space-y-2 mt-4">
-              <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 mx-auto flex items-center justify-center">
-                <BookmarkIcon className="w-5 h-5 fill-current" />
+            <div className="bg-white dark:bg-[#121721] border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-8 text-center shadow-[0_1px_2px_rgba(15,23,42,0.03)] space-y-2.5">
+              <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center">
+                <BookmarkIcon className="w-4 h-4" strokeWidth={1.75} />
               </div>
-              <h3 className="font-extrabold text-xs text-slate-800 dark:text-slate-200">
-                {bookmarks.length === 0 ? 'No bookmarks saved yet' : 'No links match your filter'}
+              <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-100">
+                {bookmarks.length === 0 ? 'Your library is empty' : 'No matching links'}
               </h3>
-              <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
                 {bookmarks.length === 0
-                  ? 'Tap the button below to save your first link to this encrypted P2P space.'
-                  : 'Try clearing your search or tag filters to see more links.'}
+                  ? 'Paste a URL above to quick-save, or tap Save link for title, tags, and notes.'
+                  : 'Try clearing your search or selected tag filter.'}
               </p>
               {bookmarks.length === 0 && (
                 <button
-                  onClick={() => {
-                    setEditingBookmark(null);
-                    setIsAddModalOpen(true);
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-sm transition active:scale-95 inline-flex items-center gap-1.5"
+                  type="button"
+                  onClick={() => handleOpenNewBookmark()}
+                  className="mt-1 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition active:scale-95 inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-3.5 h-3.5" strokeWidth={2} />
                   <span>Add First Bookmark</span>
                 </button>
               )}
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+            <div className="space-y-2.5">
               {filteredBookmarks.map(bm => (
                 <BookmarkItem
                   key={bm.id}
                   bookmark={bm}
                   currentUserName={currentUserName}
+                  showAuthor={(spaceMeta?.members?.length || 1) > 1}
                   onTogglePin={handleTogglePin}
                   onToggleArchive={handleToggleArchive}
                   onDelete={removeBookmark}
@@ -346,17 +462,16 @@ export const App: React.FC = () => {
         </main>
       </div>
 
-      {/* Floating Bottom Add Button (Mobile Friendly) */}
-      <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-30">
+      {/* Anchored Primary Action Pill (lighter height & softer shadow) */}
+      <div className="fixed bottom-5 pb-[env(safe-area-inset-bottom)] left-1/2 -translate-x-1/2 w-full max-w-md px-4 flex justify-end pointer-events-none z-30">
         <button
-          onClick={() => {
-            setEditingBookmark(null);
-            setIsAddModalOpen(true);
-          }}
-          className="w-13 h-13 sm:w-14 sm:h-14 p-3.5 rounded-full bg-sky-500 hover:bg-sky-600 text-white shadow-xl shadow-sky-500/30 flex items-center justify-center transition active:scale-90 hover:scale-105"
-          title="Add New Link"
+          type="button"
+          onClick={() => handleOpenNewBookmark()}
+          className="pointer-events-auto h-9 px-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-slate-900/15 flex items-center gap-1.5 text-xs font-medium transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+          title="Save link with title, tags, and notes"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-3.5 h-3.5" strokeWidth={2} />
+          <span>Save link</span>
         </button>
       </div>
 
@@ -366,9 +481,11 @@ export const App: React.FC = () => {
         onClose={() => {
           setIsAddModalOpen(false);
           setEditingBookmark(null);
+          setInitialUrl('');
         }}
         onSubmit={handleSaveBookmark}
         editingBookmark={editingBookmark}
+        initialUrl={initialUrl}
         existingTags={allTags}
         currentUserName={currentUserName}
       />
