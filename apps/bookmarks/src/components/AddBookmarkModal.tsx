@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { X, Check, Globe } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Check, Globe, Sparkles, Loader2 } from 'lucide-react';
 import type { Bookmark } from '../domain/schema.ts';
 import { PRESET_TAGS, getDomain, getAvatarColor } from '../domain/schema.ts';
+import { fetchUrlMeta } from '../lib/fetchUrlMeta.ts';
 
 interface AddBookmarkModalProps {
   isOpen: boolean;
@@ -28,9 +29,18 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
   const [pinned, setPinned] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const [aiEnhanced, setAiEnhanced] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
+  const lastFetchedUrl = useRef('');
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (isOpen) {
+      // Cancel any in-flight fetch when the modal re-opens / resets
+      fetchAbortRef.current?.abort();
+      fetchAbortRef.current = null;
+
       if (editingBookmark) {
         setUrl(editingBookmark.url);
         setTitle(editingBookmark.title);
@@ -51,18 +61,52 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
         setPinned(false);
       }
       setNewTagInput('');
+      setAiEnhanced(false);
+      setFetchError(false);
+      lastFetchedUrl.current = '';
     }
   }, [isOpen, editingBookmark, initialUrl]);
 
   if (!isOpen) return null;
 
-  // Auto-fill title from URL domain if title is empty
-  const handleUrlBlur = () => {
-    if (url.trim() && !title.trim()) {
-      const d = getDomain(url);
-      const cleanName = d.split('.')[0];
-      const capitalized = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-      setTitle(capitalized);
+  /**
+   * When the user leaves the URL field (or pastes a URL), try to auto-populate
+   * title + description by fetching page metadata via a CORS proxy.
+   * Falls back to a plain domain-name title if the fetch fails.
+   */
+  const handleUrlBlur = async () => {
+    const trimmed = url.trim();
+    if (!trimmed || trimmed === lastFetchedUrl.current) return;
+    lastFetchedUrl.current = trimmed;
+
+    // Cancel any previous in-flight fetch
+    fetchAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    fetchAbortRef.current = ctrl;
+
+    // Kick off fetch (show spinner)
+    setIsFetching(true);
+    setFetchError(false);
+    setAiEnhanced(false);
+
+    const meta = await fetchUrlMeta(trimmed, ctrl.signal);
+    // Ignore stale result if a new fetch was started or modal closed
+    if (ctrl.signal.aborted) return;
+
+    setIsFetching(false);
+
+    if (meta) {
+      if (meta.title && !title.trim()) setTitle(meta.title);
+      if (meta.description && !description.trim()) setDescription(meta.description);
+      setAiEnhanced(!!meta.aiEnhanced);
+    } else {
+      // Fallback: derive from domain
+      setFetchError(true);
+      if (!title.trim()) {
+        const d = getDomain(trimmed);
+        const cleanName = d.split('.')[0];
+        setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+      }
     }
   };
 
@@ -160,7 +204,9 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <Globe className="w-4 h-4" strokeWidth={1.75} />
+                {isFetching
+                  ? <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                  : <Globe className="w-4 h-4" strokeWidth={1.75} />}
               </span>
               <input
                 type="text"
@@ -173,13 +219,27 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
                 className="w-full pl-9 pr-3.5 py-2 text-base sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition dark:text-white font-mono"
               />
             </div>
+            {/* Status feedback */}
+            {isFetching && (
+              <p className="mt-1 text-[10px] text-blue-500 dark:text-blue-400 flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Fetching page info…
+              </p>
+            )}
+            {!isFetching && fetchError && (
+              <p className="mt-1 text-[10px] text-amber-500 dark:text-amber-400">
+                Couldn't auto-fill — fill in title manually.
+              </p>
+            )}
           </div>
 
           {/* Title Input */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-              Link Title
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Link Title
+              </label>
+              {isFetching && <span className="text-[10px] text-blue-400 italic">auto-filling…</span>}
+            </div>
             <input
               type="text"
               required
@@ -192,9 +252,16 @@ export const AddBookmarkModal: React.FC<AddBookmarkModalProps> = ({
 
           {/* Description Input */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-              Note / Description (Optional)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Note / Description (Optional)
+              </label>
+              {aiEnhanced && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-purple-500 dark:text-purple-400 font-semibold">
+                  <Sparkles className="w-3 h-3" /> AI summary
+                </span>
+              )}
+            </div>
             <textarea
               rows={2}
               value={description}
